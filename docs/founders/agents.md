@@ -28,12 +28,20 @@ crawling agents in [llms.txt](../../frontend/public/llms.txt), served at https:/
    mode: PayPal sandbox, no real money."
 4. **Approve.** The person opens the link and approves the pledge in PayPal, in their own account. The assistant is not
    part of this step.
-5. **Hold.** PayPal sends the person back to the campaign's page, `/p/{id}?pledge={orderId}`. The page authorizes the
+5. **Hold.** PayPal sends the person back to the campaign's page, `/p/{id}?pledge={pledgeId}`. The page authorizes the
    order: PayPal now holds the money, and the pledge counts toward the goal. The page thanks them, shows the progress
    and how to withdraw while the campaign is open.
 6. **Settle.** At the deadline (or earlier, by the owner, once the goal is met), Walk-in settles. Funded: it captures
    every hold, and PayPal Payouts sends the owner the net total. Not funded, or cancelled: it voids every hold, and
    nobody pays.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/agent-pledge-dark.png">
+  <img alt="A person approves every pledge: an assistant using Walk-in's MCP server finds the campaigns near Williamsburg (GET /api/campaigns), prepares a pledge (POST /api/campaigns/{id}/pledges, flow redirect), passes on only PayPal's own approval link; the person approves in PayPal, and the campaign's page places the hold. No tool asks for, takes, keeps or sends a payment detail." src="diagrams/agent-pledge-light.png" width="100%">
+</picture>
+
+<details>
+<summary>The same, as text</summary>
 
 ```mermaid
 sequenceDiagram
@@ -56,10 +64,12 @@ sequenceDiagram
     MCP-->>Assistant: PayPal's link, the terms, test mode
     Assistant-->>Person: Open this link and approve in PayPal
     Person->>PayPal: approves, in their own account
-    PayPal-->>Person: back to /p/{id}?pledge={orderId}
+    PayPal-->>Person: back to /p/{id}?pledge={pledgeId}
     Person->>Walkin: the page authorizes the order: PayPal holds the pledge
     Note over Walkin,PayPal: At the deadline: goal met, capture every hold; missed, void every hold
 ```
+
+</details>
 
 ## Why this is agentic commerce done safely
 

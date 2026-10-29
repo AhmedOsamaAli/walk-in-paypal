@@ -3,7 +3,9 @@
 Walk-in reads Qloo taste data for the area people can reach from a door, ranks what the block is missing and designs
 the business. This page maps the backend: its layers, a survey's lifecycle, the caching layers, how cold starts are
 kept off a visitor's way, the AI chain and its wait budget, and the numbers before and after the October 2026
-optimisation.
+optimisation. Walk-in Founders, the PayPal pledges that start from a launch kit, has
+[its own section](#walk-in-founders) at the end: its parts, the money's state machines, settlement and its lock,
+webhooks, the cron and what is cached.
 
 ```mermaid
 flowchart LR
@@ -297,6 +299,12 @@ The app itself (React and Vite, details in `frontend/README.md`):
   the design sheet, the kit and the other pages load in chunks of their own. Each lazy part holds its box while it
   loads, so nothing moves when it arrives, and sits in an error boundary, so a chunk that will not load says so in its
   place instead of taking the app down.
+- **Founders' chunk.** Walk-in Founders' two pages, the open campaigns (`/founders`) and a campaign (`/p/{id}`), load
+  together as one chunk (`foundersChunk` in `chunks.ts`, `pages/foundersPages.ts`) with the Founders styles and the
+  code for PayPal's button, so a visitor who never opens them never loads them. The kit's Founders tab ships in the
+  kit's chunk. PayPal's JS SDK itself is never bundled: it loads from PayPal, and only where a pledge can be made. A
+  link to a Founders page starts its code early but fetches no answer ahead, since a campaign's answer depends on who
+  asks and changes with every pledge.
 - **Fetching ahead.** Before its first render the app starts the code and the answer for the address it opens on;
   links start theirs when hovered, focused or touched; lists of examples fetch their surveys and kits once the browser
   is idle, never for a visitor saving data. A fetch ahead is one GET that never waits for a sleeping backend.
@@ -307,3 +315,190 @@ The app itself (React and Vite, details in `frontend/README.md`):
   initials.
 - **Measured.** First paint comes 32-44% sooner on a throttled phone on every page and the survey's map 2.6 s sooner;
   the table is in `frontend/README.md`.
+
+## Walk-in Founders
+
+Founders lets the neighbors of an empty storefront back the business a launch kit was made for. Each pledge is a PayPal
+authorization: PayPal holds the money, and it is collected only if the campaign meets its goal by its deadline. It
+plugs into the app through one seam, `app.payments.founders`: `install` adds its routes and lets PayPal's webhook and
+the cron past the Origin check (each proves itself otherwise), and `running` gives them their stores, rate limits, lock
+and settlement loop for the app's lifetime. The product rules and the API are in
+[founders/CONTRACT.md](founders/CONTRACT.md); the README explains each PayPal call and why.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="founders/diagrams/system-dark.png">
+  <img alt="One app, on free tiers: owners, neighbors and AI assistants use the web app on Cloudflare Pages, which fronts one FastAPI server on Render with Neon Postgres; the server calls Qloo, PayPal REST, a Gemini-then-Groq AI chain, OpenStreetMap services and Google sign-in; GitHub Actions runs 1,480 tests, the settlement pass and a keep-awake ping." src="founders/diagrams/system-light.png" width="100%">
+</picture>
+
+<details>
+<summary>Founders' parts and calls, as text</summary>
+
+```mermaid
+flowchart LR
+    owner(["Owner<br/>signed in with Google"]) --> pages["Cloudflare Pages<br/>the kit's Founders tab, /founders, /p/id"]
+    supporter(["Supporter<br/>no account"]) --> pages
+    supporter -.->|"approves in PayPal's window"| paypal
+    agent(["AI assistant<br/>MCP: find, get, back"]) --> pages
+    pages -->|"/api, campaigns no-store"| api["FastAPI<br/>routes.campaigns, routes.hooks"]
+    api --> settler["app.settlement.Settler<br/>one lock"]
+    api --> paypal["PayPal REST<br/>Orders v2, Payments v2,<br/>Payouts v1, Webhooks v1"]
+    settler --> paypal
+    paypal -->|"webhooks, verified"| api
+    cron["settle.yml<br/>every 3 hours"] -->|"POST /api/cron/settle"| api
+    api --> db[("Postgres<br/>campaigns, pledges,<br/>payouts, paypal_events")]
+    settler --> db
+```
+
+</details>
+
+| Part | Files | Job |
+|---|---|---|
+| Seam | `app/payments/founders.py` | The routes, the callbacks' exemption, the stores, the rate limits (20 pledges and 30 drafts an hour per address), the lock and the settlement loop. |
+| PayPal client | `app/payments/paypal.py` | The OAuth token, Orders v2, Payments v2, Payouts v1 and Webhooks v1; a `PayPal-Request-Id` on every POST; retries; pure readers of PayPal's answers. |
+| Pledge rules | `app/payments/pledges.py` | Pure logic, no storage: the terms, progress, the funded decision (`decide_funding`), what each pledge needs (`decide`), doing it with PayPal (`settle`), and the AI-drafted words with their checks (`draft_offer`, `offer_problems`). |
+| Records | `app/payments/records.py` | Rows as the dataclasses above, money in cents, PayPal's refusals as HTTP answers, the payout email checked and masked. |
+| Settlement | `app/settlement.py` | `Settler`: a pass over what is due (`run_once`), the owner's close and cancel (`close`), payouts, the background loop. |
+| Routes | `app/routes/campaigns.py`, `app/routes/hooks.py`, `app/routes/kits.py`, `app/routes/account.py` | Drafting and publishing; the campaign page; pledges created, held and withdrawn; close and cancel; PayPal's webhook and the cron; a kit's campaigns; `paypal` in `/api/config` and the campaigns in My places. |
+| Storage | `app/db/campaigns.py`, `app/db/events.py`, `app/db/tables.py`, `migrations/versions/0003_founders.py` | The `campaigns`, `pledges`, `payouts` and `paypal_events` tables. A campaign keeps its page as published and has no foreign key to its survey, so it outlives the survey; the purge also keeps the surveys behind campaigns. |
+| Web | `frontend/src/pages/CampaignPage.tsx`, `FoundersPage.tsx`, `components/founders/`, `lib/founders.ts`, `lib/paypalSdk.ts`, `api/founders.ts` | The pages, the kit's Founders tab, PayPal's button (JS SDK v6), the terms in plain words. The Content-Security-Policy allows PayPal's script, frames and connections (`app/main.py`, `frontend/public/_headers`, `vite.config.ts`). |
+| Agents | `mcp_server/walkin_mcp.py`, `frontend/public/llms.txt` | `find_campaigns`, `get_campaign` and `back_campaign`, which hands over PayPal's approval link. |
+| Schedule | `.github/workflows/settle.yml` | One settlement pass every 3 hours. |
+
+### The money's state machines
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="founders/diagrams/states-dark.png">
+  <img alt="The money's states. A campaign: open, then funded and collected (partial until every hold is collected), or expired or cancelled with every hold released. A pledge: created, then authorized (held, counting toward the goal), then captured; or declined, withdrawn, voided, expired, failed or refunded." src="founders/diagrams/states-light.png" width="100%">
+</picture>
+
+A pledge (`pledges.status`, `PledgeStatus` in `app/payments/pledges.py`). Only `authorized` and `captured` count toward
+the goal, once per PayPal payer. "Open" means while the campaign takes pledges; a "late" hold was placed after that:
+
+<details>
+<summary>A pledge's states, as text</summary>
+
+```mermaid
+stateDiagram-v2
+    [*] --> created: order created, intent AUTHORIZE
+    created --> authorized: approved, then held while open
+    created --> declined: PayPal denies the hold
+    created --> withdrawn: withdrawn before approving
+    created --> voided: held too late, released at once
+    authorized --> withdrawn: withdrawn while open
+    authorized --> captured: funded, renewed first past day 3
+    authorized --> voided: short, cancelled or late
+    authorized --> expired: the hold ran out first
+    authorized --> failed: funded, capture refused
+    captured --> failed: capture declined later
+    captured --> refunded: refunded or reversed
+```
+
+</details>
+
+A campaign (`campaigns.status`, `CampaignStatus`). `open` also covers a campaign past its close and not settled yet (its
+page says "Settling"); `funded` is stored, with `funded = true`, before the first capture:
+
+<details>
+<summary>A campaign's states, as text</summary>
+
+```mermaid
+stateDiagram-v2
+    [*] --> open: the owner publishes
+    open --> funded: closed with the goal met
+    open --> expired: the deadline passed short of the goal
+    open --> cancelled: the owner cancelled short of the goal
+    funded --> collected: every valid hold captured
+    funded --> partial: some holds not captured yet, or refused
+    partial --> collected: the rest captured on a later pass
+    collected --> [*]
+    expired --> [*]
+    cancelled --> [*]
+```
+
+</details>
+
+A payout (`payouts.status`, one per campaign) is `pending` from the moment it is recorded, before PayPal is asked, then
+`paid` or `failed`; the API says `none` until it exists. PayPal's statuses map onto these: an authorization `CREATED`
+is `authorized`, `PENDING` stays `created` (it counts once PayPal confirms the hold) and `DENIED` is `declined`; a
+capture `COMPLETED` or `PENDING` is `captured`, `DECLINED` or `FAILED` is `failed`, `REFUNDED` is `refunded`; a payout
+item `SUCCESS` is `paid`, `PENDING`, `UNCLAIMED`, `ONHOLD` or `NEW` is `pending`, and `FAILED`, `RETURNED`, `BLOCKED`,
+`REFUNDED`, `REVERSED`, `DENIED` or `CANCELED` is `failed`.
+
+### Settlement and its lock
+
+- **What is due** (`CampaignStore.due`), oldest deadline first: open campaigns past their deadline or early close;
+  funded ones; partial or collected ones with a capture PayPal has not completed or itemized, captured in the last 30
+  days; and any closed one with a hold left over (it came in late). Then the payouts due (`payouts_due`): funded
+  campaigns collected or partial, with money collected, nothing still held, every capture completed and itemized, and
+  no payout yet or one still pending. A pass with nothing due costs two queries.
+- **One campaign** (`Settler._settle`): read it and its pledges; ask PayPal again about captures it had not completed or
+  itemized (`GET /v2/payments/captures/{id}`); run `pledges.settle`, whose `record` stores `funded` and the status
+  before PayPal is called at all; then store the new status, the owner's report and every changed pledge in one
+  transaction (`CampaignStore.save`). A pledge that failed for a passing reason stays `authorized` for the next pass.
+- **One payout** (`Settler._pay_out`): add up `net_cents` of the completed captures; insert the payout row as `pending`
+  (its key is the campaign's id, so a second insert finds the first); then `POST /v1/payments/payouts` with
+  `sender_batch_id` set to the campaign's id and `request_key("payout", campaign_id)`. A refused duplicate leads to the
+  original batch, a passing failure stays `pending` for the next pass, and any other refusal marks it `failed`.
+- **The lock.** `Settler.lock`, one `asyncio.Lock`, is taken by every pass (`run_once`), by the owner's close and cancel
+  (`close`, which checks the owner's conditions under it), by placing a hold (`hold_pledge`, from the page or a webhook)
+  and by withdrawing. Each reads the campaign and the pledge again under it, so no pledge changes while its campaign
+  closes or settles. Publishing takes a second lock (`campaign_lock`) for one open campaign per owner per kit. Webhook
+  updates outside the lock are conditional writes (`update_pledge(..., only=...)`, `update_payout(..., unless=...)`).
+  The lock lives in one process, and Founders runs as one.
+- **Who runs a pass:** the loop every `SETTLE_EVERY_S` seconds (and at startup), the cron endpoint, a background task
+  after each webhook, and the owner's close or cancel, which settles that campaign at once and pays it out when ready.
+
+### Webhooks
+
+- `POST /api/paypal/webhook` (`app/routes/hooks.py`) exists only with PayPal configured and `PAYPAL_WEBHOOK_ID` set.
+  PayPal calls the backend's own address, registered by `docs/founders/setup_paypal_webhook.py` with the client's
+  `WEBHOOK_EVENTS`. A body over 1 MB is refused.
+- **Verified first**, with `verify-webhook-signature` on the raw body, byte for byte: 400 when PayPal does not confirm
+  it, 503 when PayPal cannot answer (PayPal delivers it again).
+- **Kept once** in `paypal_events` by PayPal's event id: a repeat answers `{"status": "duplicate"}`, a kind the app
+  does not listen to `{"status": "ignored"}`. If handling fails, the event is forgotten, so the next delivery is
+  handled.
+- **Handled:** `CHECKOUT.ORDER.APPROVED` and `PAYMENT.AUTHORIZATION.CREATED` hold a pledge still `created` (the
+  supporter approved but never came back), through `hold_pledge` and its lock; `PAYMENT.AUTHORIZATION.VOIDED` releases
+  one; `PAYMENT.CAPTURE.COMPLETED` and `.PENDING` record the capture and its net; `.DENIED` and `.DECLINED` fail it;
+  `.REFUNDED` and `.REVERSED` refund it (the capture is found behind the refund's link); payout batch and item events
+  update the payout, a batch read back with its items. A settlement pass follows in the background.
+
+### The cron
+
+- `.github/workflows/settle.yml` runs at minute 17 of every third hour (UTC), and by hand. It sends
+  `POST {BACKEND_URL}/api/cron/settle` with `X-Cron-Secret`, waiting up to 180 s and retrying three times 30 s apart
+  while a sleeping instance wakes. Without the repository secrets `BACKEND_URL` and `CRON_SECRET` it does nothing.
+- The endpoint does not exist without `CRON_SECRET` on the server, compares the secret in constant time, and answers
+  what it did: `{"settled": [{"id", "status"}], "payouts": [{"id", "status"}]}`.
+- On the free deployment `SETTLE_EVERY_S=0`. A loop every 3 minutes would query Postgres every 3 minutes and keep the
+  shared Neon database from sleeping (it scales to zero after 5 idle minutes), so the cron settles instead: a campaign
+  settles within about 3 hours of its deadline, well inside the 2 days the longest campaign keeps of its holds' 29.
+  An owner's close or cancel still settles at once. The `render.yaml` blueprint keeps the default, 180; the live free
+  service sets 0.
+
+### What is cached
+
+- **Campaigns: nothing.** The campaign routes set no `Cache-Control`, so the cache policy's guard makes every answer
+  `no-store`, and the front door passes it through (`x-walkin-cache: bypass`): campaigns change with every pledge, and
+  the owner's part depends on who asks.
+- **A kit's campaigns come apart from the kit.** `GET /api/kits/{token}` is the same for every visitor, so memory and
+  the front door keep it (an example's kit for a day, with a stale copy for a week). Its campaigns are therefore not in
+  it: the page reads them from `GET /api/kits/{token}/campaigns` (`no-store`, the viewer's own first), shows the kit
+  without waiting for them, and reads them again on a sign-in or a sign-out (`state/kit.ts`). The poster's QR code and
+  its line use the viewer's own open campaign.
+- **The PayPal settings are public.** `GET /api/config` carries `paypal` (whether pledging is on, the public client id
+  the JS SDK needs, the environment) and `surveys_paused`, and is cached like the presets (`max-age=300,
+  s-maxage=3600`, with a stale copy): a change of PayPal settings reaches visitors within about an hour.
+- **Founders' pages fetch nothing ahead.** A link to one starts its code, not its answer.
+
+### Settings
+
+| Variable | Default | What it does |
+|---|---|---|
+| `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | empty | The PayPal REST app. Without them pledging is off, and the pages say why. |
+| `PAYPAL_ENV` | `sandbox` | Anything but `live` stays on PayPal's sandbox (`api-m.sandbox.paypal.com`). |
+| `PAYPAL_WEBHOOK_ID` | empty | The webhook verify-webhook-signature checks against; without it the webhook route does not exist. |
+| `CRON_SECRET` | empty | The secret for `POST /api/cron/settle`; without it the route does not exist. |
+| `SETTLE_EVERY_S` | 180 | Seconds between in-app settlement passes; 0 turns the loop off (the free deployment). |
+| `SURVEYS_PAUSED` | false | `true`: `GET /api/run` answers 503, and the web app shows the surveyed storefronts. |
