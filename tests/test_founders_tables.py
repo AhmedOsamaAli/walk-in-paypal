@@ -12,7 +12,7 @@ from sqlalchemy import String, inspect
 
 from app.db import Database
 from app.db.tables import campaigns, kits, payouts, paypal_events, pledges, surveys, users
-from app.payments import paypal
+from app.payments import paypal, receipts
 from app.payments import pledges as rules
 from app.payments.records import CURRENCY, EMAIL
 from app.routes.campaigns import PLEDGE_REF, PledgeRequest
@@ -67,6 +67,7 @@ WRITTEN: dict[str, dict[str, list | int]] = {
         "capture_id": PAYPAL_ID,
         "capture_status": [*CAPTURE_STATUSES, *CAPTURE_OUTCOME, *(code for _, code in CAPTURE_REFUSED.values())],
         "error": list(ISSUES),
+        "receipt_hash": [receipts.mint()[1]],
     },
     "payouts": {
         "campaign_id": [uuid.uuid4().hex[:16]],

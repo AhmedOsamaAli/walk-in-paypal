@@ -28,6 +28,37 @@ npm run preview    # dist/ on :4173 under the production Content-Security-Policy
 | `functions/` | The Cloudflare Pages Function for `/api/*` (`api/[[path]].ts`) and its tested logic (`_lib/proxy.ts`, `_lib/cache.ts`). |
 | `public/` | `_headers` (CSP and security headers, immutable caching of `/assets/*`), `theme.js` (sets the theme before first paint), the icon. |
 
+## One poster system, different launch scenarios
+
+The launch-kit poster and the Founders campaign poster use the same editor and vector renderer
+(`components/kit/PosterSection.tsx` and `PosterArt.tsx`). A regular launch leads with the business's checked offer;
+a campaign leads with an actual participation perk, includes every other perk, and states its own payment terms.
+The owner may choose a different real perk as the headline. A campaign that has closed cannot print a new-pledge CTA.
+
+`lib/posterProject.ts` selects customer-facing lines from existing checked copy, never invents measured evidence and
+does not print targeting names, gap scores or catchment-analysis text as advertising. `lib/posterBrand.ts` chooses a
+project-appropriate visual direction and palette; `PosterMotif.tsx` draws original business-related artwork and
+subtle contextual shadows. Text and accent-panel contrast are tested at 4.5:1 or better.
+
+The owner can change the direction and accent, add a permitted raster logo and choose coming-soon versus now-open
+wording. Settings and logos stay on this device; the logo is embedded in downloads, not uploaded. The optional
+locator uses real streets around the proposed door, not a decorative survey catchment or competitor arrows.
+
+The branded QR frame sits outside a five-module white quiet zone; modules remain sharp black on white, without an
+overlaid logo. Its destination is a public campaign or an approved owner page, never a private receipt or individual
+PayPal approval. `lib/posterExport.ts` embeds local fonts and the logo in SVG and 2400×3392 PNG output without
+broadening the production CSP. The same renderer supplies a one-page A4 or Letter print/PDF.
+
+The kit's Report tab and `/k/<token>/dossier` embed that customized poster, not a separate template or an editor link.
+The report PDF keeps its analysis and maps and adds the actual poster as a dedicated A4/Letter page. The shared
+device-local design store keeps the editor, report preview and document synchronized, including the owner's logo,
+checked headline and selected real participation perk. Printing waits for typefaces, actual campaign terms and
+ready artwork; a failed campaign lookup cannot silently become a generic launch poster. The report preview loads
+only when its tab is opened. Campaign posters use the compact "Demo payments — no real money." disclosure; the
+PayPal SDK, endpoints and runtime environment remain sandbox.
+
+If text, terms or perks do not fit, printing and downloading stop with an explanation instead of dropping words.
+
 ## Routes
 
 Routing is the address itself (`lib/routes.ts` parses it; `App.tsx` follows `popstate`); in-app links go through

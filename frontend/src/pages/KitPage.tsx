@@ -3,10 +3,11 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { ApiError } from "../api/client";
 import { kits, type Kit, type KitView } from "../api/kit";
 import { BrandMark } from "../components/BrandMark";
-import { FoundersTab, ownCampaign } from "../components/founders/FoundersTab";
+import { FoundersTab } from "../components/founders/FoundersTab";
 import { CopyChecks, CopyDeck } from "../components/kit/CopyDeck";
 import { DossierBody, dossierContents, dossierGist } from "../components/kit/DossierView";
-import { PosterSection } from "../components/kit/PosterSection";
+import { KitPoster } from "../components/kit/KitPoster";
+import { ReportPoster } from "../components/kit/ReportPoster";
 import { OWN_LINK_ID, TrackedLinks, useLanding } from "../components/kit/TrackedLinks";
 import { Link } from "../components/Link";
 import { Page, PageHead, useDocumentTitle, useFocusOnMount } from "../components/Page";
@@ -15,8 +16,9 @@ import type { TitleField } from "../components/SiteHeader";
 import { panelId, tabId, TabPager, TabPanel, Tabs, type TabItem } from "../components/Tabs";
 import { dateText } from "../lib/account";
 import { letter } from "../lib/format";
+import { ownCampaign } from "../lib/founders";
 import { focusHeading } from "../lib/journey";
-import { kitError, trackedUrl } from "../lib/kit";
+import { kitError } from "../lib/kit";
 import { KIT_PARTS, kitPart, partInHash, type KitPart } from "../lib/kitParts";
 import { scrollBehavior } from "../lib/motion";
 import { BRIEF_URL, dossierUrl, PLACES_URL } from "../lib/routes";
@@ -216,14 +218,12 @@ function bringIntoView(then: Then): void {
   if (then.pinned) window.scrollTo({ top: then.y - then.under, behavior: "instant" });
 }
 
-function Ready({ view, kit }: { view: KitView; kit: Kit }) {
+function Ready({ view, kit, campaignsError }: { view: KitView; kit: Kit; campaignsError: string | null }) {
   const { website, invalid, landing, setWebsite } = useLanding(view.token, view.survey_url);
   const [part, setPart] = usePart();
   const then = useRef<Then | null>(null);
   /** A part chosen from the foot of the last one: focus moves to the new part's heading once it shows. */
   const focusNext = useRef(false);
-  const posterLink = kit.links.find((link) => link.key === "poster");
-  const posterUrl = posterLink ? trackedUrl(landing.url, posterLink.query) : landing.url;
   const campaign = ownCampaign(view);
   const contents = dossierContents(kit.dossier);
   const cover = kit.dossier.cover;
@@ -302,11 +302,11 @@ function Ready({ view, kit }: { view: KitView; kit: Kit }) {
                 : "Print it for the window. Add your link under Links and it carries a QR code to it."
           }
         />
-        <PosterSection
-          poster={kit.poster}
-          link={posterUrl}
+        <KitPoster
+          view={view}
+          kit={kit}
           landing={landing}
-          campaign={campaign}
+          campaignsError={campaignsError}
           onAddLink={() => {
             choose("links", "field");
           }}
@@ -352,6 +352,7 @@ function Ready({ view, kit }: { view: KitView; kit: Kit }) {
               PDF”.
             </p>
           </div>
+          {part === "report" ? <ReportPoster preview view={view} kit={kit} landing={landing} campaignsError={campaignsError} /> : null}
           <ol className="dz-toc">
             {contents.map(({ key, no, title }) => (
               <li key={key}>
@@ -433,7 +434,7 @@ function useTitleFocus(): (node: HTMLElement | null) => void {
  * tab each. */
 export function KitPage({ token }: { token: string }) {
   const { phase, user } = useSession();
-  const { load, restart } = useKit(token, phase === "loading" ? undefined : (user?.id ?? null));
+  const { load, restart, campaignsError } = useKit(token, phase === "loading" ? undefined : (user?.id ?? null));
   const titleRef = useTitleFocus();
   const view = load.state === "shown" ? load.view : null;
   const kit = view?.status === "ready" ? view.kit : null;
@@ -500,7 +501,7 @@ export function KitPage({ token }: { token: string }) {
       ) : null}
       {view?.status === "building" ? <Building view={view} stalled={load.state === "shown" ? load.stalled : null} onCheck={restart} /> : null}
       {view?.status === "failed" ? <Failed view={view} onRetried={restart} /> : null}
-      {view && kit ? <Ready view={view} kit={kit} /> : null}
+      {view && kit ? <Ready view={view} kit={kit} campaignsError={campaignsError} /> : null}
       {view?.status === "ready" && !kit ? (
         <section className="pg-sec" aria-label="The kit did not load">
           <p className="page-alert" role="alert">

@@ -3,7 +3,7 @@ import { useRef } from "react";
 import { paypalOf, type KitCampaign } from "../../api/founders";
 import type { Kit, KitView } from "../../api/kit";
 import { cx } from "../../lib/css";
-import { dayText, deadlineText, heldText, inSandbox, moneyText, neededText, statusText, supportersText } from "../../lib/founders";
+import { dayText, deadlineText, heldText, inSandbox, moneyText, neededText, ownCampaign, statusText, supportersText } from "../../lib/founders";
 import { absoluteUrl } from "../../lib/kit";
 import { isPlainClick } from "../../lib/navigation";
 import { useSession } from "../../state/session";
@@ -13,11 +13,6 @@ import { SignInOptions } from "../SignIn";
 import { CampaignForm } from "./CampaignForm";
 import { ProgressBar } from "./ProgressBar";
 import { SandboxNotice } from "./SandboxNotice";
-
-/** The viewer's own open campaign for this kit, which the tab and the poster show. */
-export function ownCampaign(view: KitView): KitCampaign | null {
-  return view.campaigns?.find((campaign) => campaign.is_owner && campaign.status === "open") ?? null;
-}
 
 /** The count, the money and the terms of a kit's campaign, in a line or two. */
 function Standing({ campaign, name }: { campaign: KitCampaign; name: string }) {

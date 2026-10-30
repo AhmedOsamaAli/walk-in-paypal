@@ -58,6 +58,32 @@ afterEach(() => {
 });
 
 describe("the campaign API", () => {
+  it("drafts and publishes an owner's business without inventing a kit", async () => {
+    const business = {
+      name: "Morning Table", kind: "cafe" as const, description: "Breakfast and coffee for our neighbors.",
+      why_here: "Somewhere to meet.", address: "East Austin, Texas", lat: 30.26, lon: -97.71,
+      amount: "25.00", goal: 3, deadline: "2026-11-16T18:00:00Z", perk: null,
+    };
+    const draft = { title: "Morning Table", pitch: "Breakfast and coffee.", perks: ["A founders' preview"], how_it_works: "Held, not charged.", problems: [] };
+    const calls = stubFetch(json(draft), json({ id: "c1", url: "/p/c1" }));
+    await expect(founders.draftBusiness(business)).resolves.toEqual(draft);
+    await expect(founders.publishBusiness({ ...business, payout_email: "owner@example.com",
+      title: draft.title, pitch: draft.pitch, perks: draft.perks })).resolves.toEqual({ id: "c1", url: "/p/c1" });
+    expect(calls.map((call) => call.url)).toEqual(["/api/business-campaigns/draft", "/api/business-campaigns"]);
+    expect(sent(calls[0])).not.toHaveProperty("kit_token");
+    expect(sent(calls[1])).toMatchObject({ name: "Morning Table", kind: "cafe", payout_email: "owner@example.com" });
+  });
+  it("reads a private receipt without caching or sending its URL as a referrer", async () => {
+    const token = "x".repeat(32);
+    const body = { status: "authorized", state: "Held", explanation: "PayPal holds your pledge." };
+    const calls = stubFetch(json(body), json({ ...body, status: "withdrawn" }));
+    await expect(founders.receipt(token)).resolves.toEqual(body);
+    await expect(founders.withdrawReceipt(token)).resolves.toMatchObject({ status: "withdrawn" });
+    expect(calls[0]?.url).toBe(`/api/receipts/${token}`);
+    expect(calls[0]?.init).toMatchObject({ cache: "no-store", referrerPolicy: "no-referrer" });
+    expect(calls[1]?.url).toBe(`/api/receipts/${token}/withdraw`);
+    expect(calls[1]?.init).toMatchObject({ method: "POST", referrerPolicy: "no-referrer" });
+  });
   it("reads a campaign by its id", async () => {
     const calls = stubFetch(json(CAMPAIGN));
     await expect(founders.campaign("c4f1e2")).resolves.toEqual(CAMPAIGN);

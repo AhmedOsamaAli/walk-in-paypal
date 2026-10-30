@@ -1,9 +1,10 @@
 """Walk-in Founders' campaigns. A signed-in owner starts one from any ready launch kit (the examples' included): the
 owner sets the money terms, the AI drafts the words from the kit's concept and the survey's evidence, the owner edits
 them and the server checks them again. Neighbors pledge with PayPal without an account: each pledge is an AUTHORIZE
-order, so PayPal only holds the money, and a supporter may withdraw while the campaign is open. It settles when it
-closes (app.settlement), and the owner is paid the net collected total. Holding or withdrawing a pledge, and the owner's
-close or cancel, take the settlement's lock, so no pledge changes while its campaign closes or settles."""
+order, so PayPal only holds the money, and a supporter may withdraw while the campaign is open, on its page or with the
+pledge's private receipt (app.routes.receipts). It settles when it closes (app.settlement), and the owner is paid the
+net collected total. Holding or withdrawing a pledge, and the owner's close or cancel, take the settlement's lock, so no
+pledge changes while its campaign closes or settles."""
 from __future__ import annotations
 
 import logging
@@ -17,7 +18,7 @@ from pydantic import BaseModel, Field
 from .. import auth
 from ..config import settings
 from ..kits import designed
-from ..payments import pledges
+from ..payments import pledges, receipts
 from ..payments.paypal import RESOURCE_ID, PayPalError, approval_url, authorized_in_full, request_key
 from ..payments.records import (
     CURRENCY,
@@ -52,15 +53,18 @@ CLOSED_WHILE_HELD = (
 LATE = timedelta(seconds=1)
 
 
-class Terms(BaseModel):
+class MoneyTerms(BaseModel):
     """The owner's terms. They are checked by pledges.validate_campaign, which says what is wrong in plain words."""
 
-    kit_token: str = Field(..., min_length=1, max_length=64, description="The ready launch kit the campaign starts from")
     amount: Any = Field(None, description='Each pledge, "5.00" to "200.00"', examples=["25.00"])
     goal: Any = Field(None, description="Supporters needed, 3 to 500", examples=[40])
     deadline: Any = Field(None, description="ISO 8601 with a time zone, 1 to 27 days away")
     perk: Any = Field(None, description="What founding supporters get, in the owner's words, or null",
                       examples=["10% off every visit in the first year"])
+
+
+class Terms(MoneyTerms):
+    kit_token: str = Field(..., min_length=1, max_length=64, description="The ready launch kit the campaign starts from")
 
 
 class NewCampaign(Terms):
@@ -94,7 +98,7 @@ def perk_of(value: Any) -> str | None:
     return " ".join(value.split()) or None
 
 
-def check_terms(body: Terms, now: datetime, name: str | None = None) -> tuple[Any, list[str]]:
+def check_terms(body: MoneyTerms, now: datetime, name: str | None = None) -> tuple[Any, list[str]]:
     """The deadline as a datetime, and what is wrong with the owner's terms; the perk line must offer something beyond
     the pledge (`name` is the business's, which a perk may mention)."""
     deadline = deadline_of(body.deadline)
@@ -195,8 +199,8 @@ async def campaign_view(request: Request, row: dict) -> dict:
         "status": row["status"],
         "accepting": pledges.accepting(campaign, now),
         "kit_token": row["kit_token"],
-        "kit_url": f"/k/{row['kit_token']}",
-        "survey_url": f"/s/{row['survey_id']}?sheet={row['idx']}",
+        "kit_url": f"/k/{row['kit_token']}" if row["kit_token"] else None,
+        "survey_url": f"/s/{row['survey_id']}?sheet={row['idx']}" if row["survey_id"] else None,
         "name": offer.get("name") or "",
         "place": place_of(row),
         "concept": offer.get("concept") or {"genre": "", "summary": ""},
@@ -213,6 +217,8 @@ async def campaign_view(request: Request, row: dict) -> dict:
         "progress": public_progress(progress),
         "is_owner": owner,
     }
+    if row["kit_token"] is None:
+        view["source"] = "owner"
     if owner:
         view["owner"] = {
             "counts": progress["counts"],
@@ -341,7 +347,8 @@ async def pledge(
 ) -> dict:
     """A PayPal order (intent AUTHORIZE) that will hold one supporter's pledge. The page's PayPal buttons approve it by
     its id; with flow "redirect" the answer carries PayPal's approval link, and PayPal sends the supporter back to the
-    campaign's page to hold it there."""
+    campaign's page to hold it there. Either way the answer carries the pledge's private receipt, once: only its digest
+    is kept (app.payments.receipts)."""
     state = request.app.state
     row = await campaign_row(request, campaign_id)
     campaign = campaign_of(row)
@@ -370,11 +377,12 @@ async def pledge(
     approve = approval_url(order)
     if flow == "redirect" and not approve:
         raise HTTPException(502, "PayPal did not return an approval link. Try again in a moment.")
+    receipt, digest = receipts.mint()
     await state.campaigns.add_pledge(
         id=pledge_id, campaign_id=campaign_id, order_id=order_id, flow=flow, amount_cents=row["amount_cents"],
-        status="created",
+        status="created", receipt_hash=digest,
     )
-    return {"order_id": order_id, "approve_url": approve if flow == "redirect" else None}
+    return {"order_id": order_id, "approve_url": approve if flow == "redirect" else None, "receipt": receipt}
 
 
 async def release_late(request: Request, campaign: pledges.Campaign, found: dict, order: dict | None = None) -> bool:
@@ -503,9 +511,19 @@ async def withdraw(
     await campaign_row(request, campaign_id)
     if await state.campaigns.pledge_in(campaign_id, order_id) is None:
         raise HTTPException(404, "Pledge not found.")
+    progress = await withdraw_pledge(request, campaign_id, order_id)
+    return {"status": "withdrawn", "progress": public_progress(progress)}
+
+
+async def withdraw_pledge(request: Request, campaign_id: str, reference: str) -> dict:
+    """Withdraws a campaign's pledge, by its order id or our own id, and gives the campaign's progress after it;
+    idempotent. Under the settlement lock, so never while a settlement collects it: the campaign and the pledge are read
+    again under it. Only while the campaign takes pledges (409 after): PayPal voids a hold, and a pledge never approved
+    is withdrawn without PayPal. Both the campaign's page and the pledge's receipt (app.routes.receipts) withdraw here."""
+    state = request.app.state
     async with state.settler.lock:  # never while a settlement collects it
         row = await campaign_row(request, campaign_id)
-        found = await state.campaigns.pledge_in(campaign_id, order_id)
+        found = await state.campaigns.pledge_in(campaign_id, reference)
         if found is None:
             raise HTTPException(404, "Pledge not found.")
         if found["status"] != "withdrawn":
@@ -524,8 +542,7 @@ async def withdraw(
                 await state.campaigns.update_pledge(found["id"], only=("created",), status="withdrawn")
             else:
                 raise HTTPException(409, "This pledge can no longer be withdrawn.")
-        progress = await progress_now(request, row)
-    return {"status": "withdrawn", "progress": public_progress(progress)}
+        return await progress_now(request, row)
 
 
 async def settle_now(request: Request, campaign_id: str, *, cancel: bool = False) -> dict:

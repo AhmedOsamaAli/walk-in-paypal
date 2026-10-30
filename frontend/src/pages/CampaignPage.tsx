@@ -7,6 +7,7 @@ import { CopyButton } from "../components/CopyButton";
 import { PayPalPledge } from "../components/founders/PayPalPledge";
 import { ProgressBar } from "../components/founders/ProgressBar";
 import { SandboxNotice } from "../components/founders/SandboxNotice";
+import { CampaignPosterButton } from "../components/founders/CampaignPosterButton";
 import { Link } from "../components/Link";
 import { MapsLink } from "../components/MapsLink";
 import { Page, useDocumentTitle, useFocusOnMount } from "../components/Page";
@@ -32,6 +33,7 @@ import { campaignUrl, FOUNDERS_URL, type CampaignRoute } from "../lib/routes";
 import { useNow } from "../lib/useNow";
 import { heldPledge, keepPledge, useCampaign, type HeldPledge } from "../state/founders";
 import { session, useSession } from "../state/session";
+import { PrivateReceipt } from "../components/founders/PrivateReceipt";
 
 /** A pledge the supporter approved on PayPal's own page, which sent them back here to place the hold. */
 type Return = { orderId: string; phase: "holding" } | { orderId: string; phase: "failed"; message: string };
@@ -118,6 +120,7 @@ function Held({ campaign, pledge, onWithdrawn }: { campaign: Campaign; pledge: H
         PayPal holds your {amount}. You are charged only if {campaign.goal} neighbors join by {dayText(campaign.deadline)};
         otherwise the hold is released and you pay nothing.
       </p>
+      {pledge.receipt ? <PrivateReceipt token={pledge.receipt} /> : null}
       {campaign.accepting ? (
         <div className="cp-held-out">
           <p>Changed your mind? You can withdraw from this browser while the campaign is open.</p>
@@ -164,7 +167,7 @@ interface PledgeCardProps {
   back: Return | null;
   said: Said;
   news: string;
-  onHeld: (orderId: string, progress: CampaignProgress) => void;
+  onHeld: (orderId: string, progress: CampaignProgress, receipt?: string) => void;
   onWithdrawn: (progress: CampaignProgress) => void;
   onProgress: (progress: CampaignProgress) => void;
   onClosed: () => void;
@@ -246,9 +249,9 @@ function PledgeCard({ campaign, now, held, back, said, news, onHeld, onWithdrawn
   return (
     <section className="cp-card" aria-label={`Back ${campaign.name}`}>
       <Standing campaign={campaign} now={now} />
-      {action}
       {/* The owner's part above already says it. */}
       {!campaign.is_owner && (!paypal || (paypal.enabled && inSandbox(paypal))) ? <SandboxNotice className="cp-sandbox" /> : null}
+      {action}
       <p className="sr-only" role="status" aria-live="polite">
         {news}
       </p>
@@ -325,9 +328,9 @@ function OwnerPanel({ campaign, onCampaign }: { campaign: Campaign; onCampaign: 
             <code ref={box}>{share}</code>
             <CopyButton text={share} what="the campaign's link" target={box} />
           </p>
-          <Link className="text-link cp-owner-kit" href={`${campaign.kit_url}#poster`}>
+          {campaign.kit_url ? <Link className="text-link cp-owner-kit" href={`${campaign.kit_url}#poster`}>
             The window poster, with its QR code to this page <span aria-hidden="true">→</span>
-          </Link>
+          </Link> : null}
         </div>
         <div className="cp-owner-col">
           {owner?.report?.length ? (
@@ -426,7 +429,7 @@ function Story({ campaign }: { campaign: Campaign }) {
       {campaign.evidence.length ? (
         <section className="cp-sec" aria-labelledby="cp-why">
           <h2 className="cp-h" id="cp-why">
-            Why this, why here
+            {campaign.source === "owner" ? "Why here, in the owner's words" : "Why this, why here"}
           </h2>
           <ol className="cp-evidence">
             {campaign.evidence.map((line) => (
@@ -435,12 +438,14 @@ function Story({ campaign }: { campaign: Campaign }) {
               </li>
             ))}
           </ol>
-          <p className="cp-source">
+          {campaign.source === "owner" ? (
+            <p className="cp-source">Provided by the owner. Not verified by a Walk-in survey.</p>
+          ) : campaign.survey_url ? <p className="cp-source">
             From Walk-in&apos;s survey of the {campaign.place.area} around the door, with Qloo&apos;s taste data.{" "}
             <Link className="text-link" href={campaign.survey_url}>
               See the survey <span aria-hidden="true">→</span>
             </Link>
-          </p>
+          </p> : null}
         </section>
       ) : null}
       {campaign.perks.length ? (
@@ -484,12 +489,12 @@ function Story({ campaign }: { campaign: Campaign }) {
         <p className="cp-genre mono">{campaign.concept.genre}</p>
         <p className="cp-summary">{campaign.concept.summary}</p>
         <p className="cp-plan-links">
-          <Link className="text-link" href={campaign.kit_url}>
+          {campaign.kit_url ? <Link className="text-link" href={campaign.kit_url}>
             The launch kit <span aria-hidden="true">→</span>
-          </Link>
-          <Link className="text-link" href={campaign.survey_url}>
+          </Link> : null}
+          {campaign.survey_url ? <Link className="text-link" href={campaign.survey_url}>
             The survey <span aria-hidden="true">→</span>
-          </Link>
+          </Link> : null}
           <MapsLink lat={campaign.place.lat} lon={campaign.place.lon} />
         </p>
       </section>
@@ -633,6 +638,7 @@ export function CampaignPage({ route }: { route: CampaignRoute }) {
         </p>
       </header>
       {campaign.is_owner ? <OwnerPanel campaign={campaign} onCampaign={replace} /> : null}
+      {campaign.is_owner ? <CampaignPosterButton campaign={campaign} /> : null}
       <div className="cp-body">
         <aside className="cp-side">
           <PledgeCard
@@ -642,8 +648,8 @@ export function CampaignPage({ route }: { route: CampaignRoute }) {
             back={back}
             said={said}
             news={news}
-            onHeld={(orderId, progress) => {
-              const pledge = { orderId, at: new Date().toISOString() };
+            onHeld={(orderId, progress, receipt) => {
+              const pledge = { orderId, at: new Date().toISOString(), ...(receipt ? { receipt } : {}) };
               keepPledge(id, pledge);
               setHeld(pledge);
               setSaid(null);

@@ -73,6 +73,8 @@ describe("cacheableRequest", () => {
     ["GET", "/api/kits/Av7v5rcNyjXToUQ9JyFkEyHFEHJ_jijsedhKYeMtO4E", true],
     ["GET", "/api/run?lat=1&lon=2", false],
     ["GET", "/api/run/", false],
+    ["GET", "/api/receipts/Kq3vX9_pL2mN8rT4wY6zA1bC5dE7fG0h", false],
+    ["POST", "/api/receipts/Kq3vX9_pL2mN8rT4wY6zA1bC5dE7fG0h/withdraw", false],
     ["HEAD", "/api/presets", false],
     ["POST", "/api/design", false],
     ["DELETE", "/api/me", false],

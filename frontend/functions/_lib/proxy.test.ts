@@ -348,6 +348,21 @@ describe("while the backend is waking, down or failing", () => {
     expect(response.status).toBe(503);
     expect(status(response)).toBe("bypass");
   });
+
+  it("never keeps a receipt nor answers one from a copy, even one a backend marked public by mistake", async () => {
+    const path = "/api/receipts/Kq3vX9_pL2mN8rT4wY6zA1bC5dE7fG0h";
+    const door = setup(json({ status: "authorized" }, 200, { "cache-control": SHARED_STALE }), html());
+    const first = await door.send(path);
+    expect(status(first)).toBe("bypass");
+    expect(door.cache.entries.size).toBe(0);
+    // Even were a copy of its URL somehow kept, it would not be used: a sleeping backend gets the waking note.
+    await door.cache.put(staleKey(new URL(`${FRONT}${path}`)), json({ status: "authorized" }, 200, { "cache-control": SHARED }));
+    await door.cache.put(freshKey(new URL(`${FRONT}${path}`)), json({ status: "authorized" }, 200, { "cache-control": SHARED }));
+    const asleep = await door.send(path);
+    expect(asleep.status).toBe(503);
+    expect(status(asleep)).toBe("bypass");
+    expect(door.deps.sleep).not.toHaveBeenCalled();
+  });
 });
 
 describe("without a working cache", () => {

@@ -213,6 +213,7 @@ function StartOne() {
         </li>
       </ol>
       <div className="fd-start-go">
+        <Link className="go" href="/founders/start">Opening your own business? Start without a survey</Link>
         <Link className="go" href={EXAMPLES_URL}>
           <span>Open a launch kit from the examples</span>
           <i aria-hidden="true">

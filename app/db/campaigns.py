@@ -110,7 +110,8 @@ class CampaignStore:
     async def survey_ids(self) -> list[str]:
         """The surveys behind campaigns, kept from the purge of old surveys so their kits and links stay."""
         async with self._engine.connect() as connection:
-            return list((await connection.execute(select(campaigns.c.survey_id).distinct())).scalars())
+            query = select(campaigns.c.survey_id).where(campaigns.c.survey_id.is_not(None)).distinct()
+            return list((await connection.execute(query)).scalars())
 
     async def update(self, campaign_id: str, **values: object) -> None:
         async with self._engine.begin() as connection:

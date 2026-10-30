@@ -1,10 +1,11 @@
 import { cx } from "../../lib/css";
+import { SANDBOX_NOTICE } from "../../lib/founders";
 
-/** Wherever money appears while PayPal runs in its sandbox: "Test mode: PayPal sandbox, no real money." */
+/** A compact, explicit disclosure at payment decisions and money/status views. */
 export function SandboxNotice({ className }: { className?: string }) {
   return (
     <p className={cx("sandbox", className)}>
-      <span className="sandbox-tag mono">Test mode:</span> PayPal sandbox, no real money.
+      {SANDBOX_NOTICE}
     </p>
   );
 }

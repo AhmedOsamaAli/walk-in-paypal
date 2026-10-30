@@ -1052,7 +1052,8 @@ def test_the_tools_over_the_mcp_protocol(monkeypatch):
 
     tools, survey, examples, saved, limited = asyncio.run(session())
 
-    assert set(tools) == {"survey_storefront", "list_examples", "get_survey", "find_campaigns", "get_campaign", "back_campaign"}
+    assert set(tools) == {"survey_storefront", "list_examples", "get_survey", "find_campaigns", "get_campaign", "back_campaign",
+                          "pledge_status", "withdraw_pledge"}
     schema = tools["survey_storefront"].inputSchema
     assert set(schema["properties"]) == {"place", "lat", "lon", "travel", "minutes", "km", "ages", "business"}
     assert schema["properties"]["travel"]["enum"] == ["walk", "drive", "distance"]
@@ -1179,7 +1180,7 @@ def test_no_tool_sends_or_receives_payment_details(monkeypatch):
     tools, answers = asyncio.run(session())
 
     fields = {name for tool in tools for name in tool.inputSchema["properties"]}  # nothing to give
-    assert fields == {"place", "lat", "lon", "travel", "minutes", "km", "ages", "business", "run_id", "campaign_id"}
+    assert fields == {"place", "lat", "lon", "travel", "minutes", "km", "ages", "business", "run_id", "campaign_id", "receipt"}
     assert not [name for name in fields if PAYMENT_WORDS.search(name)]
 
     assert [json.loads(request.content) for request in api.requests if request.content] == [{"flow": "redirect"}]

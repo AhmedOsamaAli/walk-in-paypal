@@ -20,7 +20,7 @@ EMAIL = re.compile(
     r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@(?=.{4,120}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
     r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.[A-Za-z]{2,24}$"
 )
-TEST_MODE = "Test mode: PayPal sandbox, no real money."
+TEST_MODE = "Demo payments — no real money."
 
 
 class Problem(Exception):

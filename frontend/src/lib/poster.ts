@@ -1,73 +1,76 @@
-/* The window poster's layout: where each line of the kit's poster goes on a portrait sheet (A-series proportions),
-   from a function that measures text. Pure, so it is tested with a stand-in measure. */
+/* One customer-first layout for launch and Founders posters. Art yields space to the offer, perks and payment terms. */
+import type { Campaign } from "../api/founders";
+import type { KitPoster } from "../api/kit";
+import type { PosterMap } from "../api/sitemap";
+
+export type PosterInput = Pick<KitPoster, "name" | "tagline" | "headline" | "subline" | "hours" | "claim"> &
+  Partial<Pick<KitPoster, "site" | "neighborhoods">> & {
+    map?: PosterMap | null;
+    location_label?: string;
+    identity?: { kind: string; keywords: readonly string[] };
+    messages?: readonly string[];
+  };
+export type PosterCampaign = Pick<Campaign, "id" | "amount" | "goal" | "deadline" | "perks" | "accepting">;
 
 export const POSTER_W = 600;
 export const POSTER_H = 848;
-export const POSTER_M = 44;
+export const POSTER_M = 38;
 const INNER = POSTER_W - 2 * POSTER_M;
-
 export type Face = "serif" | "sans" | "mono";
-
-/** The width of `text` set in a face at a size, in poster units. */
+export const POSTER_FONTS: Record<Face, string> = {
+  serif: '"Newsreader Variable", Newsreader, Georgia, serif',
+  sans: '"Geist Variable", Geist, system-ui, sans-serif',
+  mono: '"Geist Mono Variable", "Geist Mono", ui-monospace, monospace',
+};
 export type Measure = (text: string, face: Face, size: number, italic?: boolean) => number;
 
 export interface Block {
   lines: string[];
   size: number;
-  /** Each line's baseline. */
   y: number[];
-  /** Each line's width, for the highlighter behind a headline. */
   widths: number[];
 }
-
-export interface Box {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-export interface PosterLayout {
-  name: Block;
-  tagline: Block | null;
-  headline: Block | null;
-  map: { y: number; height: number };
-  bandTop: number;
-  /** The Founders campaign's line in its yellow box, beside the QR code to the campaign; null without a campaign. */
-  back: { box: Box; text: Block } | null;
-  subline: Block | null;
-  hours: Block | null;
-  hoursLabelY: number | null;
-  /** Where the hours and their label start. */
-  hoursX: number;
-  /** The box the hours sit in when they take the QR code's place; null when they run under the subline. */
-  hoursBox: Box | null;
-  /** The QR code's square; null for a poster without a link of the owner's to send a passer-by to. */
-  qr: { x: number; y: number; size: number } | null;
-  proof: Block | null;
-}
-
+export interface Box { x: number; y: number; width: number; height: number }
 export interface PosterText {
   name: string;
   tagline: string | null;
   headline: string | null;
   subline: string | null;
   hours: string | null;
+  /** Source proof is shown in the editor, not printed as customer advertising. */
   proof: string | null;
-  /** The owner's open Founders campaign, in a line from its own terms ("Back it before it opens: pledge $25, …"). */
   back?: string | null;
+  /** Every actual perk is kept; none is silently shortened to fit. */
+  perks?: readonly string[];
+  location?: string | null;
+  sandbox?: boolean;
+}
+export interface PosterLayout {
+  name: Block;
+  tagline: Block | null;
+  headline: Block | null;
+  headlineLabelY: number | null;
+  subline: Block | null;
+  art: Box;
+  perks: Block[];
+  perksLabelY: number | null;
+  map: Box | null;
+  location: Block | null;
+  bandTop: number;
+  back: Block | null;
+  hours: Block | null;
+  qr: { x: number; y: number; size: number } | null;
+  fits: boolean;
+  problem: string | null;
 }
 
-/** Words broken into lines no wider than `width` when set; at most `most` lines, the last one ending in "…" if cut. */
 export function fitLines(text: string, width: number, measure: (line: string) => number, most: number): string[] {
   const lines: string[] = [];
   let line = "";
   for (const word of text.split(/\s+/).filter(Boolean)) {
     const trial = line ? `${line} ${word}` : word;
-    if (line && measure(trial) > width) {
-      lines.push(line);
-      line = word;
-    } else line = trial;
+    if (line && measure(trial) > width) { lines.push(line); line = word; }
+    else line = trial;
   }
   if (line) lines.push(line);
   if (lines.length <= most) return lines;
@@ -78,179 +81,79 @@ export function fitLines(text: string, width: number, measure: (line: string) =>
   return kept;
 }
 
-/** The name in one line when it can be set large, else in two balanced lines. */
-function nameLines(name: string, measure: Measure, scale: number): { lines: string[]; size: number } {
-  const one = measure(name, "serif", 100);
-  const single = Math.min(104, (100 * INNER) / Math.max(one, 1)) * scale;
-  if (single >= 62 * scale || !name.includes(" ")) return { lines: [name], size: Math.min(single, 104) };
-  const words = name.split(/\s+/);
-  let best: string[] = [name];
-  let widest = Infinity;
-  for (let cut = 1; cut < words.length; cut += 1) {
-    const pair = [words.slice(0, cut).join(" "), words.slice(cut).join(" ")];
-    const width = Math.max(...pair.map((line) => measure(line, "serif", 100)));
-    if (width < widest) {
-      widest = width;
-      best = pair;
-    }
-  }
-  return { lines: best, size: Math.min(92, (100 * INNER) / Math.max(widest, 1)) * scale };
-}
-
-function block(lines: string[], size: number, top: number, leading: number, width: (line: string) => number): Block {
-  const y = lines.map((_, index) => Math.round(top + size * 0.8 + index * size * leading));
-  return { lines, size, y, widths: lines.map(width) };
-}
-
-const bottomOf = (b: Block | null, fallback: number) => (b ? (b.y.at(-1) ?? fallback) + b.size * 0.3 : fallback);
-
-const QR_SIZE = 148;
-const GUTTER = 28;
-const HOURS_SIZE = 13.5;
-const BOX_PAD = 16;
-const BOX_MOST = 232;
-export const BACK_SIZE = 17;
-export const BACK_PAD = 14;
-// The campaign's line is set a little heavier than the measure assumes: it keeps this much room spare.
-const BACK_SLACK = 0.94;
-/** Nothing in the band runs below this, clear of the proof line at the foot. */
-const BAND_FLOOR = POSTER_H - 58;
-
-/**
- * Lays the poster out; when the walk's map would be too small, the name is set smaller until it fits. Without a QR code
- * the band keeps its two columns: the subline on the left, and the hours in a box where the code would be. With a
- * Founders campaign, the campaign's line takes the top of the left column in a yellow box beside the QR code; the
- * subline follows it, smaller, and the hours only when they still fit.
- */
-export function layoutPoster(text: PosterText, measure: Measure, { qr = true }: { qr?: boolean } = {}): PosterLayout {
-  let layout = attempt(text, measure, 1, qr);
-  for (const scale of [0.86, 0.74, 0.62]) {
-    if (layout.map.height >= 170) break;
-    layout = attempt(text, measure, scale, qr);
-  }
-  return layout;
-}
-
-function attempt(text: PosterText, measure: Measure, scale: number, withQr: boolean): PosterLayout {
-  const top = 84;
-  const named = nameLines(text.name, measure, scale);
-  const name = block(named.lines, named.size, top, 0.98, (line) => measure(line, "serif", named.size));
-  let y = bottomOf(name, top);
-
-  let tagline: Block | null = null;
-  if (text.tagline) {
-    const size = 21;
-    const lines = fitLines(text.tagline, INNER, (line) => measure(line, "serif", size, true), 2);
-    tagline = block(lines, size, y + 10, 1.3, (line) => measure(line, "serif", size, true));
-    y = bottomOf(tagline, y);
-  }
-
-  let headline: Block | null = null;
-  if (text.headline) {
-    let size = 38 * Math.max(scale, 0.8);
-    let lines = fitLines(text.headline, INNER - 8, (line) => measure(line, "serif", size, true), 4);
-    if (lines.length > 2) {
-      size *= 0.84;
-      lines = fitLines(text.headline, INNER - 8, (line) => measure(line, "serif", size, true), 3);
-    }
-    headline = block(lines, size, y + 18, 1.16, (line) => measure(line, "serif", size, true));
-    y = bottomOf(headline, y);
-  }
-
-  const bandTop = POSTER_H - 236;
-  const slotTop = bandTop + 24;
-  const groups = (text.hours ?? "").split(" · ").filter(Boolean).slice(0, 4);
-  const hoursWidth = (line: string) => measure(line, "sans", HOURS_SIZE);
-  // Without a QR code, the hours take its place in a box as wide as they need, between the code's width and BOX_MOST.
-  const boxed = !withQr && Boolean(text.subline) && groups.length > 0;
-  const boxWidth = boxed
-    ? Math.ceil(Math.min(BOX_MOST, Math.max(QR_SIZE, ...groups.map(hoursWidth).map((width) => width + 2 * BOX_PAD))))
-    : 0;
-  const right = withQr ? QR_SIZE : boxWidth;
-  const columnWidth = right ? INNER - right - GUTTER : INNER;
-  let back: PosterLayout["back"] = null;
-  let bandY = bandTop + 26;
-  if (text.back) {
-    const width = (line: string) => measure(line, "sans", BACK_SIZE);
-    const lines = fitLines(text.back, (columnWidth - 2 * BACK_PAD) * BACK_SLACK, width, 4);
-    const words = block(lines, BACK_SIZE, slotTop + BACK_PAD - 2, 1.28, width);
-    const bottom = Math.round(bottomOf(words, slotTop) + BACK_PAD);
-    back = { box: { x: POSTER_M, y: slotTop, width: columnWidth, height: bottom - slotTop }, text: words };
-    bandY = bottom + 18;
-  }
-  let subline: Block | null = null;
-  if (text.subline) {
-    const said = text.subline;
-    const size = back ? 15 : 19;
-    const width = (line: string) => measure(line, "sans", size);
-    let lines = fitLines(said, columnWidth, width, back ? 2 : 3);
-    let candidate = block(lines, size, bandY, 1.32, width);
-    // Under the campaign's line, the subline shortens to fit the band, or gives way.
-    if (back && bottomOf(candidate, bandY) > BAND_FLOOR) {
-      lines = fitLines(said, columnWidth, width, 1);
-      candidate = block(lines, size, bandY, 1.32, width);
-    }
-    if (!back || bottomOf(candidate, bandY) <= BAND_FLOOR) {
-      subline = candidate;
-      bandY = bottomOf(subline, bandY) + 14;
-    }
-  }
-  let hours: Block | null = null;
-  let hoursLabelY: number | null = null;
-  let hoursBox: Box | null = null;
-  const hoursX = boxed ? POSTER_W - POSTER_M - boxWidth + BOX_PAD : POSTER_M;
-  if (groups.length) {
-    hoursLabelY = Math.round(boxed ? slotTop + BOX_PAD + 10 : bandY + 12);
-    const width = boxed ? boxWidth - 2 * BOX_PAD : columnWidth;
-    const lines = groups.flatMap((group) => fitLines(group, width, hoursWidth, 1));
-    hours = block(lines, HOURS_SIZE, hoursLabelY + 6, 1.38, hoursWidth);
-    if (boxed) {
-      const bottom = Math.round(bottomOf(hours, hoursLabelY) + BOX_PAD);
-      hoursBox = { x: POSTER_W - POSTER_M - boxWidth, y: slotTop, width: boxWidth, height: bottom - slotTop };
-    } else if (back && bottomOf(hours, hoursLabelY) > BAND_FLOOR) {
-      // Under the campaign's line there may be no room left for them.
-      hours = null;
-      hoursLabelY = null;
-    }
-  }
-
-  let proof: Block | null = null;
-  if (text.proof) {
-    const size = 8.6;
-    const lines = fitLines(`Why the poster can say it: ${text.proof}`, INNER, (line) => measure(line, "mono", size), 2);
-    proof = block(lines, size, POSTER_H - 46, 1.45, (line) => measure(line, "mono", size));
-  }
-
-  const mapTop = Math.round(y + 26);
-  return {
-    name,
-    tagline,
-    headline,
-    map: { y: mapTop, height: Math.round(bandTop - 22 - mapTop) },
-    bandTop,
-    back,
-    subline,
-    hours,
-    hoursLabelY,
-    hoursX,
-    hoursBox,
-    qr: withQr ? { x: POSTER_W - POSTER_M - QR_SIZE, y: slotTop, size: QR_SIZE } : null,
-    proof,
-  };
-}
-
-/** A stand-in measure from character counts, for tests and for the first paint before the fonts have loaded. */
 export const roughMeasure: Measure = (text, face, size, italic = false) =>
-  text.length * size * (face === "mono" ? 0.6 : face === "sans" ? 0.52 : italic ? 0.43 : 0.47);
+  text.length * size * (face === "mono" ? .6 : face === "sans" ? .52 : italic ? .43 : .47);
 
-/**
- * The line over the poster's map, in capitals, for the area the survey read ("10-minute walk", "30-minute drive",
- * "25 km drive"): "EVERYONE INSIDE THE BLUE LINE IS A 10-MINUTE WALK AWAY", "… IS WITHIN A 30-MINUTE DRIVE".
- */
-export function posterAreaLine(area: string): string {
-  // The article follows the number as it is said: "an 8-minute walk", "an 11 km drive", "an 18-minute drive".
-  const words = `${/^(8|1[18](?!\d))/.test(area) ? "AN" : "A"} ${area.toUpperCase()}`;
-  return /walk$/i.test(area.trim())
-    ? `EVERYONE INSIDE THE BLUE LINE IS ${words} AWAY`
-    : `EVERYONE INSIDE THE BLUE LINE IS WITHIN ${words}`;
+function block(text: string | null, size: number, top: number, width: number, face: Face, measure: Measure, leading = 1.26): Block | null {
+  if (!text?.trim()) return null;
+  const lines = fitLines(text, width, (line) => measure(line, face, size), Infinity);
+  return { lines, size, y: lines.map((_, i) => top + size * .82 + i * size * leading),
+    widths: lines.map((line) => measure(line, face, size)) };
+}
+const bottom = (value: Block | null, empty: number) => value ? (value.y.at(-1) ?? empty) + value.size * .3 : empty;
+
+function named(name: string, face: Face, measure: Measure): Block {
+  let size = Math.min(92, INNER / Math.max(1, measure(name, face, 100)) * 100);
+  if (size >= 61) {
+    return { lines: [name], size, y: [76 + size * .82], widths: [measure(name, face, size)] };
+  }
+  const spaced = name.includes(" ");
+  const words = spaced ? name.split(/\s+/).filter(Boolean) : Array.from(name);
+  let pair = [name];
+  let widest = Infinity;
+  for (let i = 1; i < words.length; i++) {
+    const candidate = [words.slice(0, i).join(spaced ? " " : ""), words.slice(i).join(spaced ? " " : "")];
+    const span = Math.max(...candidate.map((line) => measure(line, face, 100)));
+    if (span < widest) { widest = span; pair = candidate; }
+  }
+  size = Math.min(80, INNER / Math.max(1, widest) * 100);
+  return { lines: pair, size, y: pair.map((_, i) => 76 + size * (.82 + i * .98)),
+    widths: pair.map((line) => measure(line, face, size)) };
+}
+
+export function layoutPoster(text: PosterText, measure: Measure, options: { qr?: boolean; locator?: boolean; face?: Face } = {}): PosterLayout {
+  const face = options.face ?? "serif";
+  const name = named(text.name, face, measure);
+  let y = bottom(name, 76) + 10;
+  const tagline = block(text.tagline, 17.5, y, INNER, "serif", measure);
+  y = bottom(tagline, y) + (tagline ? 12 : 0);
+  const headlineLabelY = text.back && text.headline ? y + 11 : null;
+  if (headlineLabelY !== null) y += 24;
+  const headline = block(text.headline, 29, y, INNER, face, measure, 1.12);
+  y = bottom(headline, y) + (headline ? 14 : 0);
+  const subline = block(text.subline, 16, y, INNER, "sans", measure);
+  y = bottom(subline, y) + (subline ? 12 : 0);
+  const bandTop = POSTER_H - 200;
+  const perkValues = (text.perks ?? []).filter((line) => line.trim());
+  const perkHeight = perkValues.reduce((sum, line) => sum + (block(line, 16.5, 0, INNER - 24, "sans", measure)?.y.length ?? 0) * 20.8 + 9, 0);
+  const locationHeight = text.location ? bottom(block(text.location, 11.5, 0, INNER, "sans", measure), 0) + 8 : 0;
+  const mapHeight = options.locator ? 94 : 0;
+  const room = bandTop - 42 - y - perkHeight - (perkValues.length ? 28 : 0) - locationHeight - mapHeight;
+  const artHeight = room < 48 ? 0 : Math.min(text.back ? 142 : 226, room);
+  const art = { x: POSTER_M, y, width: INNER, height: artHeight };
+  y += artHeight + (artHeight ? 15 : 0);
+  const perksLabelY = perkValues.length ? y + 11 : null;
+  if (perksLabelY !== null) y += 26;
+  const perks = perkValues.map((line) => {
+    const perk = block(line, 16.5, y, INNER - 24, "sans", measure);
+    if (!perk) throw new Error("An empty perk reached the poster layout.");
+    y = bottom(perk, y) + 10;
+    return perk;
+  });
+  const map = options.locator ? { x: POSTER_M, y, width: INNER, height: 94 } : null;
+  if (map) y += map.height + 8;
+  const location = block(text.location ?? null, 11.5, y, INNER, "sans", measure);
+  y = bottom(location, y);
+  const qr = options.qr === false ? null : { x: POSTER_W - POSTER_M - 132, y: bandTop + 29, size: 132 };
+  const footerWidth = qr ? INNER - qr.size - 24 : INNER;
+  const back = block(text.back ?? null, 12.5, bandTop + 44, footerWidth, "sans", measure);
+  const hours = !back ? block(text.hours, 12, bandTop + 47, footerWidth, "sans", measure) : null;
+  const blocks = [name, tagline, headline, subline, ...perks, location];
+  const contentFits = y < bandTop - 4 && blocks.every((item) => (item?.widths ?? []).every((width) => width <= INNER + .5));
+  const footerFits = bottom(back ?? hours, bandTop) <= POSTER_H - 66;
+  const fits = contentFits && footerFits && name.size >= 26;
+  return {
+    name, tagline, headline, headlineLabelY, subline, art, perks, perksLabelY, map, location, bandTop, back, hours, qr, fits,
+    problem: fits ? null : "This copy does not fit legibly. Turn off the locator or shorten the poster copy; no perks or terms have been omitted.",
+  };
 }

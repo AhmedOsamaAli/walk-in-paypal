@@ -14,7 +14,7 @@ interface PayPalPledgeProps {
   campaign: Campaign;
   paypal: PayPalConfig;
   /** PayPal holds the pledge: its order id, which withdrawing it needs, and the count with it. */
-  onHeld: (orderId: string, progress: CampaignProgress) => void;
+  onHeld: (orderId: string, progress: CampaignProgress, receipt?: string) => void;
   /** The count moved without a hold. */
   onProgress: (progress: CampaignProgress) => void;
   /** The campaign stopped taking pledges meanwhile: the page reads it again. */
@@ -51,6 +51,7 @@ export function PayPalPledge({ campaign, paypal, onHeld, onProgress, onClosed }:
     let session: PayPalSession | null = null;
     // The order whose way to pay PayPal declined: the next click reopens it.
     let retry: string | null = null;
+    let receipt: string | undefined;
     // A failure already said here, which PayPal's own error after it must not repeat.
     let explained = false;
     let holdingNow = false;
@@ -64,7 +65,7 @@ export function PayPalPledge({ campaign, paypal, onHeld, onProgress, onClosed }:
         const result = await founders.authorize(latest.current.id, orderId);
         if (result.status === "authorized") {
           setNote(null);
-          latest.current.onHeld(orderId, result.progress);
+          latest.current.onHeld(orderId, result.progress, receipt);
         } else {
           latest.current.onProgress(result.progress);
           setNote({ tone: "error", text: "PayPal declined the pledge, so nothing is held. Try again, or pay another way." });
@@ -94,7 +95,10 @@ export function PayPalPledge({ campaign, paypal, onHeld, onProgress, onClosed }:
       retry = null;
       if (again) return Promise.resolve({ orderId: again });
       return founders.pledge(latest.current.id).then(
-        (started) => ({ orderId: started.order_id }),
+        (started) => {
+          receipt = started.receipt;
+          return { orderId: started.order_id };
+        },
         (error: unknown) => {
           explained = true;
           if (error instanceof ApiError && error.status === 409) {

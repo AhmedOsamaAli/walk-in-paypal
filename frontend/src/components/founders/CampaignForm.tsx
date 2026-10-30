@@ -1,6 +1,6 @@
 import { useId, useState, type ReactNode, type SyntheticEvent } from "react";
 import { ApiError } from "../../api/client";
-import { conflictUrl, founders, problemsOf, type CampaignTerms } from "../../api/founders";
+import { conflictUrl, founders, problemsOf, type BusinessDescription } from "../../api/founders";
 import { plainError } from "../../lib/account";
 import { cx } from "../../lib/css";
 import {
@@ -8,8 +8,8 @@ import {
   deadlineRange,
   defaultDeadline,
   LIMITS,
+  moneyTermsOf,
   pledgeTerms,
-  termsOf,
   termsProblems,
   wordsProblems,
   type TermsField,
@@ -28,14 +28,17 @@ interface Draft extends Words {
   terms: string;
 }
 
-interface CampaignFormProps {
-  token: string;
+interface CampaignFormBase {
   /** The business, as the kit names it. */
   name: string;
   /** The signed-in owner's email, the payout email's first guess. */
   email: string;
   sandbox: boolean;
 }
+type CampaignFormProps = CampaignFormBase & (
+  | { token: string; business?: never }
+  | { business: BusinessDescription; token?: never }
+);
 
 function Counter({ text, max }: { text: string; max: number }) {
   const length = text.trim().length;
@@ -77,7 +80,7 @@ function Field({ id, label, aside, hint, problem, className, children }: FieldPr
  * Starting a campaign: the owner's money terms (theirs alone), then words AI drafts from the kit's evidence, which the
  * owner edits, then publishing; the server checks the terms and every edited line again.
  */
-export function CampaignForm({ token, name, email, sandbox }: CampaignFormProps) {
+export function CampaignForm({ token, business, name, email, sandbox }: CampaignFormProps) {
   const navigate = useNavigate();
   const ids = useId();
   const now = useNow(60_000);
@@ -100,8 +103,8 @@ export function CampaignForm({ token, name, email, sandbox }: CampaignFormProps)
 
   const termProblems = termsProblems(form, now);
   const shown = (field: TermsField) => (tried || touched[field] ? termProblems[field] : null);
-  const terms = termsOf(form, token, now);
-  const termsKey = JSON.stringify(terms ? [terms.amount, terms.goal, terms.deadline, terms.perk] : null);
+  const terms = moneyTermsOf(form, now);
+  const termsKey = JSON.stringify(terms ? [terms.amount, terms.goal, terms.deadline, terms.perk, business ?? token] : null);
   const stale = draft !== null && draft.terms !== termsKey;
 
   function patch(field: keyof TermsForm, value: string) {
@@ -128,7 +131,7 @@ export function CampaignForm({ token, name, email, sandbox }: CampaignFormProps)
     event.preventDefault();
     setTried(true);
     setConflict(null);
-    const asked: CampaignTerms | null = terms;
+    const asked = terms;
     if (!asked) {
       setProblems({ when: "draft", lines: Object.values(termProblems).filter((line): line is string => line !== null) });
       return;
@@ -136,7 +139,8 @@ export function CampaignForm({ token, name, email, sandbox }: CampaignFormProps)
     setBusy("drafting");
     setProblems(null);
     try {
-      const written = await founders.draft(asked);
+      const written = business ? await founders.draftBusiness({ ...asked, ...business }) :
+        await founders.draft({ ...asked, kit_token: token });
       if (written.problems.length) setProblems({ when: "draft", lines: written.problems });
       else {
         setDraft({
@@ -167,7 +171,9 @@ export function CampaignForm({ token, name, email, sandbox }: CampaignFormProps)
     setBusy("publishing");
     setProblems(null);
     try {
-      const { url } = await founders.publish({ ...terms, payout_email: form.email.trim(), ...words });
+      const payload = { ...terms, payout_email: form.email.trim(), ...words };
+      const { url } = business ? await founders.publishBusiness({ ...payload, ...business }) :
+        await founders.publish({ ...payload, kit_token: token });
       navigate(url);
     } catch (error) {
       fail(error, "publish", "The campaign could not be published. Try again.");
@@ -358,7 +364,7 @@ export function CampaignForm({ token, name, email, sandbox }: CampaignFormProps)
             </button>
           )}
           <p className="cf-note">
-            AI writes a title, a pitch and perks from {name}&apos;s evidence. It never sets a number: your terms go in
+            AI writes a title, a pitch and perks from {name}&apos;s {business ? "description" : "evidence"}. It never sets a number: your terms go in
             unchanged, and you edit the words before anything is published.
           </p>
         </div>

@@ -103,6 +103,8 @@ export interface HeldPledge {
   orderId: string;
   /** When PayPal placed the hold. */
   at: string;
+  /** The private receipt, absent on pledges made before receipts were added. */
+  receipt?: string;
 }
 
 /** A remembered pledge as it was stored; null for anything else. */
@@ -112,7 +114,10 @@ export function readPledge(text: string | null): HeldPledge | null {
     const value: unknown = JSON.parse(text);
     if (typeof value !== "object" || value === null || !("orderId" in value) || !("at" in value)) return null;
     const { orderId, at } = value;
-    return typeof orderId === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(orderId) && typeof at === "string" ? { orderId, at } : null;
+    if (typeof orderId !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(orderId) || typeof at !== "string") return null;
+    const receipt = "receipt" in value && typeof value.receipt === "string" && /^[A-Za-z0-9_-]{32}$/.test(value.receipt)
+      ? value.receipt : undefined;
+    return { orderId, at, ...(receipt ? { receipt } : {}) };
   } catch {
     return null;
   }

@@ -7,7 +7,8 @@ per survey concept, live and go with their survey.
 
 Walk-in Founders: a campaign starts from a ready kit and keeps what its page shows (the business, the place, the
 evidence), so it outlives its survey; its pledges are PayPal orders that only hold money until it settles, its payout
-sends the net collected total to the owner, and PayPal's webhook events are kept once each.
+sends the net collected total to the owner, and PayPal's webhook events are kept once each. A pledge keeps only the
+SHA-256 of its private receipt, as a session keeps only that of its cookie.
 """
 from __future__ import annotations
 
@@ -140,9 +141,9 @@ campaigns = Table(
     Column("id", String(32), primary_key=True),
     # The kit it started from and the survey and concept behind it: no foreign keys, so a campaign outlives a survey
     # that is purged or deleted with its user's account.
-    Column("kit_token", String(64), nullable=False, index=True),
-    Column("survey_id", String(32), nullable=False),
-    Column("idx", Integer, nullable=False),
+    Column("kit_token", String(64), nullable=True, index=True),
+    Column("survey_id", String(32), nullable=True),
+    Column("idx", Integer, nullable=True),
     # The owner, the signed-in user who started it; null once they delete their account.
     Column("user_id", String(32), ForeignKey("users.id", ondelete="SET NULL"), index=True),
     Column("status", String(16), nullable=False, index=True),  # open | funded | partial | collected | expired | cancelled
@@ -186,6 +187,9 @@ pledges = Table(
     Column("net_cents", Integer),  # the capture after PayPal's fee (seller_receivable_breakdown.net_amount)
     Column("captured_at", UTCDateTime),
     Column("error", String(64)),  # PayPal's code for why the last settlement could not finish it
+    # The SHA-256 of the pledge's private receipt (app.payments.receipts), never the receipt itself; null for pledges
+    # made before receipts.
+    Column("receipt_hash", String(64), unique=True, index=True),
     _created(),
     _updated(),
 )

@@ -82,7 +82,7 @@ export function useKit(token: string, viewer?: string | null) {
   const [run, setRun] = useState(0);
   const [seen, setSeen] = useState(viewer);
   const [signIns, setSignIns] = useState(0);
-  const [campaigns, setCampaigns] = useState<{ key: string; list: KitCampaign[] } | null>(null);
+  const [campaigns, setCampaigns] = useState<{ key: string; list: KitCampaign[]; error: string | null } | null>(null);
   if (viewer !== seen) {
     setSeen(viewer);
     if (seen !== undefined && viewer !== undefined) setSignIns(signIns + 1);
@@ -134,11 +134,12 @@ export function useKit(token: string, viewer?: string | null) {
     const abort = new AbortController();
     founders.forKit(token, abort.signal).then(
       (list) => {
-        if (!abort.signal.aborted) setCampaigns({ key, list });
+        if (!abort.signal.aborted) setCampaigns({ key, list, error: null });
       },
       () => {
-        // Without them the kit still shows, as a kit with no campaign yet; a reload asks again.
-        if (!abort.signal.aborted) setCampaigns({ key, list: [] });
+        if (!abort.signal.aborted) setCampaigns({
+          key, list: [], error: "Campaign details could not be checked. Reload before printing the poster or report.",
+        });
       },
     );
     return () => {
@@ -149,6 +150,7 @@ export function useKit(token: string, viewer?: string | null) {
   const listed = campaigns?.key === key ? campaigns.list : undefined;
   return {
     load: shown.state === "shown" && listed ? { ...shown, view: { ...shown.view, campaigns: listed } } : shown,
+    campaignsError: campaigns?.key === key ? campaigns.error : null,
     restart,
   };
 }

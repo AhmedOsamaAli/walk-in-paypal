@@ -135,10 +135,10 @@ describe("the pledge's terms and the poster's line", () => {
 
   it("puts the campaign's own terms on the poster", () => {
     expect(posterLine("25.00", 40, NOV_30, UTC)).toBe(
-      "Back it before it opens: pledge $25, charged only if 40 neighbors join by Nov 30.",
+      "PayPal holds $25. You are charged only if 40 neighbors join by Nov 30; otherwise the hold is released.",
     );
     expect(posterLine("200.00", 500, "2026-12-01T09:00:00Z", UTC)).toBe(
-      "Back it before it opens: pledge $200, charged only if 500 neighbors join by Dec 1.",
+      "PayPal holds $200. You are charged only if 500 neighbors join by Dec 1; otherwise the hold is released.",
     );
   });
 });

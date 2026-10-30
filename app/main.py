@@ -209,7 +209,8 @@ def create_app(
         docs = request.url.path in ("/docs", "/redoc")
         response.headers.setdefault("Content-Security-Policy", DOCS_POLICY if docs else CONTENT_SECURITY_POLICY)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        private_receipt = request.url.path.startswith(("/r/", "/api/receipts/"))
+        response.headers.setdefault("Referrer-Policy", "no-referrer" if private_receipt else "strict-origin-when-cross-origin")
         # Google's sign-in opens a popup when the browser has no FedCM, and the popup must be able to answer this page.
         response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin-allow-popups")
         cache_policy.guard(request, response)
@@ -224,8 +225,8 @@ def create_app(
         return app
 
     # Shared links to a survey (/s), a launch kit (/k) and its printable dossier, My places (/me), the examples
-    # (/examples), the privacy note (/privacy), a campaign (/p) and the open campaigns (/founders) are pages of the web
-    # app.
+    # (/examples), the privacy note (/privacy), a campaign (/p), the open campaigns (/founders) and a pledge's private
+    # receipt (/r) are pages of the web app.
     @app.get("/s/{key}", include_in_schema=False)
     @app.get("/k/{key}", include_in_schema=False)
     @app.get("/k/{key}/dossier", include_in_schema=False)

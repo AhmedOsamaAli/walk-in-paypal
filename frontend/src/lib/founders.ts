@@ -1,9 +1,15 @@
 /* Founders in plain words: money, progress, the deadline, the pledge's terms and the poster's line, and the campaign
    form's checks, which mirror the server's limits (app/payments/pledges.py). Pure, so they are tested without a browser. */
 import type { CampaignOwner, CampaignProgress, CampaignStatus, CampaignTerms, PayPalConfig } from "../api/founders";
+import type { KitView } from "../api/kit";
 
 /** Shown wherever money appears while PayPal runs in its sandbox. */
-export const SANDBOX_NOTICE = "Test mode: PayPal sandbox, no real money.";
+export const SANDBOX_NOTICE = "Demo payments — no real money.";
+
+/** Only the viewer's own open campaign replaces this kit's launch invitation. */
+export function ownCampaign(view: KitView) {
+  return view.campaigns?.find((campaign) => campaign.is_owner && campaign.status === "open") ?? null;
+}
 
 /**
  * The owner's terms and words as the server allows them. A campaign runs at most 27 days: PayPal holds an
@@ -158,10 +164,9 @@ export function pledgeTerms(amount: string, goal: number, deadline: string, zone
   return `PayPal holds ${moneyText(amount)}. You are charged only if ${goal} neighbors join by ${dayText(deadline, zone)}; otherwise the hold is released.`;
 }
 
-/** The window poster's line, from the campaign's own terms (never the model's): "Back it before it opens: pledge $25,
- * charged only if 40 neighbors join by Nov 30." */
+/** The poster keeps the same hold, collection and release conditions as the pledge decision. */
 export function posterLine(amount: string, goal: number, deadline: string, zone: Zoned = {}): string {
-  return `Back it before it opens: pledge ${moneyText(amount)}, charged only if ${goal} neighbors join by ${dayText(deadline, zone)}.`;
+  return pledgeTerms(amount, goal, deadline, zone);
 }
 
 /** A campaign's state in a word or two, for its pill. */
@@ -344,7 +349,7 @@ export function termsProblems(form: TermsForm, now: number): Record<TermsField, 
 }
 
 /** The terms as the API takes them, once every one of them is fine; else null. */
-export function termsOf(form: TermsForm, kitToken: string, now: number): CampaignTerms | null {
+export function moneyTermsOf(form: TermsForm, now: number): Omit<CampaignTerms, "kit_token"> | null {
   const amount = normalizeAmount(form.amount);
   const goal = goalValue(form.goal);
   const deadline = deadlineFrom(form.date, form.time);
@@ -353,7 +358,12 @@ export function termsOf(form: TermsForm, kitToken: string, now: number): Campaig
     return null;
   }
   const perk = form.perk.trim().replace(/\s+/g, " ");
-  return { kit_token: kitToken, amount, goal, deadline, perk: perk || null };
+  return { amount, goal, deadline, perk: perk || null };
+}
+
+export function termsOf(form: TermsForm, kitToken: string, now: number): CampaignTerms | null {
+  const terms = moneyTermsOf(form, now);
+  return terms ? { kit_token: kitToken, ...terms } : null;
 }
 
 /** The words as the owner edited them. */

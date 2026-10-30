@@ -110,6 +110,18 @@
 }
 .poster-art { display: block; width: 100%; max-width: 520px; height: auto; box-shadow: var(--shadow); transform: rotate(-.7deg); }
 .poster-side { display: grid; gap: 18px; }
+.poster-design-controls { display: grid; gap: 12px; min-width: 0; padding: 18px; border: var(--rule); border-radius: var(--r-m); }
+.poster-design-controls legend { padding: 0 7px; color: var(--blue); font-size: 11px; }
+.poster-design-controls label { display: grid; gap: 6px; font-size: 13px; line-height: 1.4; }
+.poster-design-controls small { font-size: 12px; line-height: 1.45; color: var(--text-4); }
+.poster-design-controls .poster-check { display: flex; align-items: flex-start; gap: 9px; }
+.poster-design-controls input[type="checkbox"] { margin-top: 3px; flex: none; }
+.poster-design-controls input[type="file"] { max-width: 100%; font-size: 12px; }
+.poster-design-controls input[type="color"] { width: 58px; height: 36px; border: var(--rule); cursor: pointer; }
+.poster-actions { flex-wrap: wrap; }
+.cp-owner-poster { padding: 22px var(--pad); border-bottom: var(--rule); }
+.cp-campaign-poster { margin-top: 22px; }
+.cp-campaign-poster > .cp-h { margin-bottom: 20px; }
 .poster-side-lead { max-width: 44ch; font: 400 19px/1.42 var(--f-serif); color: var(--text-2); }
 .poster-link { font: 500 13px/1.4 var(--f-mono); overflow-wrap: anywhere; }
 /* Without the owner's link the poster has no QR code: a note asks for one, and says why. */
@@ -121,6 +133,14 @@
 .poster-ask b { font-weight: 600; color: var(--ink); }
 .poster-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .poster-tip { max-width: 52ch; font-size: 13px; line-height: 1.45; color: var(--text-4); }
+.poster-report-frame {
+  display: grid; place-items: center; padding: clamp(16px, 3.4vw, 40px);
+  background: var(--bone); border: var(--rule); border-radius: var(--r-l);
+}
+.poster-report-frame .poster-art { transform: none; }
+.dz-poster { padding: 38px var(--pad); border-top: var(--rule); }
+.dz-preview .dz-poster { margin: 24px 0; padding: 0; border: 0; }
+.dz-poster-note { max-width: 64ch; margin-bottom: 20px; font-size: 14px; line-height: 1.5; color: var(--text-3); }
 @container page (max-width: 820px) {
   .poster-section { grid-template-columns: minmax(0, 1fr); }
 }
@@ -417,6 +437,7 @@
 /* The poster: one portrait sheet that fits both A4 (190 × 277 mm inside these margins) and US Letter (195.9 × 259.4 mm).
    Set 250 mm tall it is 176.9 mm wide, and its QR code's modules span 37.7 mm. */
 @page poster { margin: 10mm; }
+@page report-poster { margin: 10mm; }
 
 @media print {
   :root[data-print="poster"] body > :not(.print-poster) { display: none !important; }
@@ -433,6 +454,8 @@
   .kit-page .page-actions, .kit-state-links, .kit-page .poster-ask a { display: none !important; }
   .kit-page .ad-card, .kit-page .link-row, .kit-page .poster-frame { break-inside: avoid; }
   .kit-page .poster-art { transform: none; box-shadow: none; }
+  .kit-page .poster-side { display: none; }
+  .kit-page .poster-section { display: block; }
   /* The report: a document, its running header and footer set by the page (lib/kit.ts reportPageCss). The cover has a
      page to itself, the contents the next, and every section starts a page of its own. */
   .dossier-page { page: report; min-height: 0; padding: 0 !important; background: none; }
@@ -460,6 +483,16 @@
   .dz-contents-title { font-size: 13pt; }
   .dz-contents small { font-size: 8.5pt; }
   .dz-sec { break-before: page; padding: 0; border: 0; }
+  .dz-poster, .dz-preview .dz-poster {
+    page: report-poster; break-before: page; break-inside: avoid;
+    margin: 0; padding: 0; border: 0;
+  }
+  .dz-poster > .dz-head, .dz-poster-note, .dossier-page .dz-end { display: none; }
+  .dz-poster .poster-report-frame { display: block; margin: 0; padding: 0; border: 0; border-radius: 0; background: none; }
+  .dz-poster .poster-art {
+    width: 176.9mm; height: 250mm; max-width: none; margin: 0 auto; transform: none;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
   .dz-head { grid-template-columns: 10mm minmax(0, 1fr); margin-bottom: 5mm; padding-bottom: 2.5mm; break-after: avoid; }
   .dz-no { padding-top: 2.6mm; font-size: 7.5pt; }
   .dz-title { font-size: 22pt; }

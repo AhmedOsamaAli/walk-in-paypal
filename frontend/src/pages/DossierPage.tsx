@@ -1,8 +1,11 @@
 import "../styles/kit.css";
-import { useEffect, useMemo } from "react";
-import type { Kit } from "../api/kit";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { Kit, KitView } from "../api/kit";
 import { DOSSIER_TITLES, DossierBody, dossierArea, dossierContents, dossierGist } from "../components/kit/DossierView";
 import { SiteMap } from "../components/kit/SiteMap";
+import { ReportPoster } from "../components/kit/ReportPoster";
+import type { PosterStatus } from "../components/kit/PosterArt";
+import { useLanding } from "../components/kit/TrackedLinks";
 import { Link } from "../components/Link";
 import { useDocumentTitle, useFocusOnMount } from "../components/Page";
 import { dateText } from "../lib/account";
@@ -12,6 +15,7 @@ import { reachText } from "../lib/launch";
 import { BRIEF_URL, kitUrl, PLACES_URL } from "../lib/routes";
 import { coverMapOf } from "../lib/sitemap";
 import { useKit, useKitNews } from "../state/kit";
+import { useSession } from "../state/session";
 
 const NEWS = {
   building: "The report is still being written. This page shows it as soon as the kit is ready.",
@@ -41,7 +45,7 @@ function printReport(): void {
   });
 }
 
-function Toolbar({ token, title, printable }: { token: string; title: string; printable: boolean }) {
+function Toolbar({ token, title, printable, ready }: { token: string; title: string; printable: boolean; ready: boolean }) {
   return (
     <div className="dz-toolbar no-print">
       <Link className="ghost mono" href={kitUrl(token)}>
@@ -51,9 +55,10 @@ function Toolbar({ token, title, printable }: { token: string; title: string; pr
       {printable ? (
         <div className="dz-toolbar-print">
           <p className="dz-toolbar-hint" id="dz-print-hint">
-            Opens the print dialog: choose “Save as PDF”, on A4 or Letter.
+            {ready ? "Opens the print dialog: choose “Save as PDF”, on A4 or Letter." :
+              "Preparing the customized poster, its typefaces and any campaign terms before printing."}
           </p>
-          <button type="button" className="ink-button" aria-describedby="dz-print-hint" onClick={printReport}>
+          <button type="button" className="ink-button" aria-describedby="dz-print-hint" disabled={!ready} onClick={printReport}>
             Save as PDF
           </button>
         </div>
@@ -62,12 +67,16 @@ function Toolbar({ token, title, printable }: { token: string; title: string; pr
   );
 }
 
-function Document({ kit, titleRef }: { kit: Kit; titleRef: (node: HTMLElement | null) => void }) {
+function Document({ view, kit, campaignsError, onPosterStatus, titleRef }: {
+  view: KitView; kit: Kit; campaignsError: string | null; onPosterStatus: (status: PosterStatus) => void;
+  titleRef: (node: HTMLElement | null) => void;
+}) {
   const { dossier } = kit;
   const cover = dossier.cover;
   const contents = dossierContents(dossier);
   const area = dossierArea(dossier);
   const map = useMemo(() => coverMapOf(cover), [cover]);
+  const { landing } = useLanding(view.token, view.survey_url);
   const catchment = cover
     ? [
         area,
@@ -163,6 +172,13 @@ function Document({ kit, titleRef }: { kit: Kit; titleRef: (node: HTMLElement | 
                 </a>
               </li>
             ))}
+            <li>
+              <a href="#dz-poster">
+                <span className="dz-no mono">P</span>
+                <span className="dz-contents-title">The customized poster</span>
+                <small>The current artwork, on its own printable page</small>
+              </a>
+            </li>
           </ol>
         </nav>
       </header>
@@ -179,6 +195,7 @@ function Document({ kit, titleRef }: { kit: Kit; titleRef: (node: HTMLElement | 
           </div>
         </section>
       ))}
+      <ReportPoster view={view} kit={kit} landing={landing} campaignsError={campaignsError} onStatus={onPosterStatus} />
       <footer className="dz-end mono">
         {kit.concept.name} · Walk-in report
         {cover ? ` · Prepared ${dateText(cover.prepared_date, UTC)} from evidence surveyed ${dateText(cover.evidence_date, UTC)}` : ""}{" "}
@@ -231,7 +248,10 @@ function Waiting({ token, message, found, titleRef, onRetry }: WaitingProps) {
 
 /** The kit's report as a document: read on screen, printed, or saved as a PDF with the page's print styles. */
 export function DossierPage({ token }: { token: string }) {
-  const { load, restart } = useKit(token);
+  const { phase, user } = useSession();
+  const { load, restart, campaignsError } = useKit(token, phase === "loading" ? undefined : (user?.id ?? null));
+  const [posterStatus, setPosterStatus] = useState<{ token: string; ready: boolean } | null>(null);
+  const onPosterStatus = useCallback((status: PosterStatus) => { setPosterStatus({ token, ready: status.ready }); }, [token]);
   const titleRef = useFocusOnMount();
   const view = load.state === "shown" ? load.view : null;
   const kit = view?.status === "ready" ? view.kit : null;
@@ -243,7 +263,7 @@ export function DossierPage({ token }: { token: string }) {
   useDocumentTitle(kit ? `${kit.concept.name} report` : "Report");
 
   let body;
-  if (kit) body = <Document kit={kit} titleRef={titleRef} />;
+  if (kit && view) body = <Document view={view} kit={kit} campaignsError={campaignsError} onPosterStatus={onPosterStatus} titleRef={titleRef} />;
   else if (load.state === "loading") body = <div className="dz-wait sk" aria-busy="true" aria-label="Loading the report" />;
   else if (load.state === "missing") {
     body = (
@@ -279,7 +299,8 @@ export function DossierPage({ token }: { token: string }) {
       <p className="sr-only" role="status" aria-live="polite">
         {news}
       </p>
-      <Toolbar token={token} title={kit ? `${kit.concept.name} · Walk-in report` : "Walk-in report"} printable={kit !== null} />
+      <Toolbar token={token} title={kit ? `${kit.concept.name} · Walk-in report` : "Walk-in report"} printable={kit !== null}
+        ready={posterStatus?.token === token && posterStatus.ready} />
       {body}
     </main>
   );

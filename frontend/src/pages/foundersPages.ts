@@ -2,3 +2,5 @@
    PayPal's buttons and the Founders styles (founders.css). */
 export { CampaignPage } from "./CampaignPage";
 export { FoundersPage } from "./FoundersPage";
+export { ReceiptPage } from "./ReceiptPage";
+export { StartCampaignPage } from "./StartCampaignPage";

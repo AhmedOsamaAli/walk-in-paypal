@@ -29,6 +29,11 @@ const KEY_VERSION = "v3";
 
 /** The survey stream: never kept, whatever its headers say. */
 const STREAM = /^\/api\/run\/?$/;
+/**
+ * A pledge's private receipt: its holder's alone, and its URL is the key to it, so it is never looked up or kept here,
+ * whatever its headers say (the backend sends no-store), and no copy of it can answer another visitor.
+ */
+const RECEIPT_PREFIX = "/api/receipts/";
 
 /** The part of Cloudflare's Cache API (`caches.default`) the front door uses; tests pass a fake. */
 export interface EdgeCache {
@@ -36,9 +41,10 @@ export interface EdgeCache {
   put: (key: string, response: Response) => Promise<void>;
 }
 
-/** Whether the edge may answer this request from a copy: a GET of an API path other than the survey stream. */
+/** Whether the edge may answer this request from a copy: a GET of an API path other than the survey stream or a receipt. */
 export function cacheableRequest(request: Request): boolean {
-  return request.method === "GET" && !STREAM.test(new URL(request.url).pathname);
+  const path = new URL(request.url).pathname;
+  return request.method === "GET" && !STREAM.test(path) && !path.startsWith(RECEIPT_PREFIX);
 }
 
 /** A Cache-Control header's directives, by lower-case name, with their values unquoted ("" for a bare directive). */

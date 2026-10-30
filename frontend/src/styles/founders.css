@@ -6,13 +6,26 @@
 
 /* ---------- Money: the test-mode notice, wherever money appears ---------- */
 .sandbox {
-  padding: 9px 13px 10px;
-  background: var(--marker); border: 1px dashed var(--on-yellow-3); border-radius: 12px;
-  font-size: 13.5px; line-height: 1.4; color: var(--ink);
+  font-size: 12.5px; line-height: 1.45; color: var(--text-3);
 }
-:root[data-theme="dark"] .sandbox { border-color: var(--yellow); }
-.sandbox-tag { margin-right: 4px; font-size: 10px; }
 .poster-side .sandbox { justify-self: start; }
+
+.cp-private-receipt { display: grid; gap: 8px; padding-top: 14px; border-top: var(--hair); font-size: 13px; line-height: 1.5; }
+.cp-private-receipt > .mono { color: var(--blue); font-size: 10px; }
+.cp-receipt-link { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cp-receipt-link > a { min-width: 0; overflow-wrap: anywhere; color: var(--blue); }
+.receipt-page { display: grid; justify-items: start; gap: 18px; max-width: 880px; padding: 32px var(--pad) 44px; }
+.receipt-page .cp-facts { width: 100%; }
+.start-campaign { padding: 32px var(--pad) 44px; }
+.business-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; max-width: 900px; }
+.business-form .cf-wide { grid-column: 1 / -1; }
+.business-form label { display: block; margin-bottom: 8px; }
+.business-form input, .business-form textarea, .business-form select { width: 100%; }
+.business-addresses { display: grid; gap: 8px; margin-top: 12px; list-style: none; }
+.business-addresses [aria-pressed="true"] { color: var(--blue); font-weight: 600; }
+@container page (max-width: 560px) {
+  .business-form { grid-template-columns: minmax(0, 1fr); }
+}
 
 /* ---------- The count toward the goal: the pen while it fills, the highlighter once it is met ---------- */
 .fd-bar {
