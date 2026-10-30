@@ -40,6 +40,10 @@ does not print targeting names, gap scores or catchment-analysis text as adverti
 project-appropriate visual direction and palette; `PosterMotif.tsx` draws original business-related artwork and
 subtle contextual shadows. Text and accent-panel contrast are tested at 4.5:1 or better.
 
+New kits and owner-described campaigns use these same adapters; showcase names are not special cases. Automatic
+artwork is deterministic from the business's identity across six art families, not an unlimited AI image or logo
+generator. The automatic mark uses the business's initials; owners can supply their own permitted logo.
+
 The owner can change the direction and accent, add a permitted raster logo and choose coming-soon versus now-open
 wording. Settings and logos stay on this device; the logo is embedded in downloads, not uploaded. The optional
 locator uses real streets around the proposed door, not a decorative survey catchment or competitor arrows.

@@ -830,7 +830,7 @@ def _stray_price(text: str, amount: str) -> str | None:
     for match in PRICE.finditer(text):
         figure = match.group(1) or match.group(2)
         if not figure or not pledge or _plain(figure.replace(",", "")) != pledge:
-            return match.group(0).strip()
+            return match.group(0).strip().rstrip(",")
     return None
 
 

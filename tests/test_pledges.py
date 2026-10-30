@@ -17,6 +17,7 @@ from app.payments.pledges import (
     Campaign,
     CampaignError,
     CampaignStatus,
+    OfferRules,
     Pledge,
     PledgeStatus,
     accepting,
@@ -29,6 +30,7 @@ from app.payments.pledges import (
     named,
     needs_reauthorization,
     new_campaign,
+    offer_problem,
     offer_problems,
     pledge_from_order,
     progress,
@@ -690,6 +692,34 @@ def test_prices_superlatives_and_made_up_names_are_refused():
     assert reason("A short walk from your door.") is None
     title = draft(llm_answering({**GOOD, "title": "Be A Founding Supporter Of Golden Hour"}, []))
     assert title["rejected"] == []  # Title Case names nobody
+
+
+@pytest.mark.parametrize(("pitch", "problem"), [
+    ("Loaves from $10, baked nearby.", "states the price $10: the pledge is the only amount the page gives"),
+    ("Loaves from $10.00, baked nearby.", "states the price $10.00: the pledge is the only amount the page gives"),
+    ("Goods for $1,200, ordered nearby.", "states the price $1,200: the pledge is the only amount the page gives"),
+    ("Goods for $1,200.50, ordered nearby.", "states the price $1,200.50: the pledge is the only amount the page gives"),
+    ("Loaves for 10 dollars, baked nearby.", "states the price 10 dollars: the pledge is the only amount the page gives"),
+    ("Pledge $25, then follow the campaign.", None),
+    ("Pledge $25.00, then follow the campaign.", None),
+    ("Pledge 25 dollars, then follow the campaign.", None),
+    ("Pledge $25, or pay $10, instead.", "states the price $10: the pledge is the only amount the page gives"),
+])
+def test_price_errors_preserve_amounts_without_sentence_punctuation(pitch, problem):
+    rules = OfferRules(numbers=frozenset({"10", "25", "1200", "1200.5"}), names=(), amount="25.00")
+    assert offer_problem(pitch, 300, rules) == problem
+
+
+@pytest.mark.parametrize("day", [9, 30])
+def test_a_deadlines_day_never_permits_an_unsupported_price(day):
+    problems = offer_problems(
+        DESIGN, title=GOOD["title"], pitch="Burgers from $9, the best in town.", perks=GOOD["perks"],
+        concept=CONCEPT, **{**TERMS, "deadline": datetime(2026, 11, day, 12, tzinfo=UTC)},
+    )
+    reason = "states the price $9: the pledge is the only amount the page gives" if day == 9 else (
+        "states 9, a number the inputs do not have"
+    )
+    assert problems == [f"The pitch {reason}."]
 
 
 def test_a_long_pitch_keeps_its_first_whole_sentences_and_avoid_adds_names():

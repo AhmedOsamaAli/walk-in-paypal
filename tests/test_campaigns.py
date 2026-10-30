@@ -175,8 +175,12 @@ def test_the_terms_and_the_edited_words_are_checked_and_bad_terms_ask_no_model(w
     assert refused(payout_email=None) == ["Give the PayPal email that receives the money."]
     assert refused(perks=["A free coffee on every visit"]) == ["Perk 1 promises a discount the owner did not set."]
     assert refused(perks=[]) == ["Add 1 to 4 perks."]
-    assert refused(pitch="Burgers from $9, the best in town.") == [
-        "The pitch states 9, a number the inputs do not have."]
+    # The goal is always a known number; a literal 9 depends on the deadline's calendar day.
+    price = body["goal"]
+    assert refused(pitch=f"Burgers from ${price}, the best in town.") == [
+        f"The pitch states the price ${price}: the pledge is the only amount the page gives."]
+    assert refused(pitch="Bring 99999 neighbors together.") == [
+        "The pitch states 99999, a number the inputs do not have."]
     assert refused(title="The best place on the block") == ['The title says "best", which nothing measured proves.']
     assert refused(title="Run by chef Marco from the corner") == ["The title names Marco."]
     assert table(client, campaigns) == []
