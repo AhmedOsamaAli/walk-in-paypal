@@ -1,38 +1,14 @@
 /* ---------- Map: the drawing on the table ---------- */
 .map-frame { position: sticky; top: var(--bar-h); height: calc(100vh - var(--bar-h)); overflow: hidden; background: var(--map-bg); }
-.map-modes {
-  position: absolute; z-index: 1002; top: auto; right: 12px; bottom: var(--map-modes-bottom, 52px); max-width: calc(100% - 24px);
-  display: flex; align-items: center; gap: 2px; padding: 3px;
+.map-street-view {
+  position: absolute; z-index: 1002; right: 12px; bottom: var(--map-link-bottom, 52px);
+  display: grid; place-items: center; width: 38px; height: 38px; padding: 0;
   background: var(--card); border: var(--rule); border-radius: 999px; box-shadow: var(--shadow-s);
 }
-.map-modes button, .map-modes a { display: grid; place-items: center; width: 30px; height: 30px; padding: 0;
-  font: 500 11px var(--f-sans); border-radius: 50%; }
-.map-modes svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.map-modes button[aria-pressed="true"] { background: var(--blue-fill); color: var(--on-blue); }
-.map-modes button:disabled { opacity: .5; cursor: not-allowed; }
-.map-frame[data-dock] .map-modes { right: 10px; }
-.map-frame[data-dock] .realistic-view { bottom: auto; height: 220px; }
-.map-frame[data-map-mode="3d"]::after { display: none; }
-.map-frame[data-map-mode="3d"] .readout, .map-frame[data-map-mode="3d"] .leaflet-control-zoom,
-.map-frame[data-map-mode="3d"] .leaflet-control-scale, .map-frame[data-map-mode="3d"] .credits { visibility: hidden; }
-.realistic-view, .realistic-view > .realistic-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.realistic-view { z-index: 405; }
-.realistic-canvas { background: #e9eee5; }
-.realistic-pin { width: 30px; height: 30px; border: 2px solid #fff; border-radius: 50%; background: #095bea;
-  color: #fff; font: 600 13px var(--f-mono); box-shadow: 0 2px 6px #182f4b4d; cursor: pointer; }
-.realistic-pin[data-role="inside"] { border-radius: 4px; background: #1d2425; }
-.realistic-pin[data-role="osm"] { border-radius: 4px; background: #fff; color: #1d2425; border: 2px dashed #1d2425; }
-.realistic-pin[data-role="famous"] { background: #fff; border-color: #095bea; color: #095bea; }
-.realistic-pin:hover, .realistic-pin:focus-visible { outline: 3px solid #ffd400; outline-offset: 2px; }
-.realistic-notice { position: absolute; z-index: 1003; top: 120px; left: 16px; right: 16px; padding: 14px;
-  color: var(--ink); background: var(--card); border: var(--rule); border-radius: 12px; font-size: 13px; line-height: 1.5; }
-.realistic-notice button { color: var(--blue); text-decoration: underline; font-weight: 600; }
-.realistic-disclosure { position: absolute; z-index: 410; top: 162px; right: 10px; max-width: min(260px, calc(100% - 30px));
-  background: #fffffff0; color: #394b42; padding: 5px 8px; border-radius: 6px; font: 400 10px/1.35 var(--f-sans); }
-.realistic-locate { position: absolute; z-index: 410; top: 115px; right: 10px; background: #fff; color: #24352e;
-  padding: 8px 12px; border: 1px solid #bac9bd; border-radius: 8px; font: 500 12px var(--f-sans); }
+.map-street-view svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.map-frame[data-dock] .map-street-view { right: 10px; }
 @media (max-width: 980px) {
-  .map-frame[data-dock] .map-modes { display: none; }
+  .map-frame[data-dock] .map-street-view { display: none; }
 }
 .map-canvas { position: absolute; inset: 0; background: var(--map-bg); cursor: crosshair; }
 .map-frame::after {
@@ -185,7 +161,7 @@
 .stage[data-mode="survey"] > .map-frame.expanded { height: 100vh; height: 100dvh; }
 html.map-full, html.map-full body { overflow: hidden; }
 .map-frame.expanded .readout { display: none; }
-.map-frame.expanded .map-modes { right: calc(12px + env(safe-area-inset-right, 0px)); }
+.map-frame.expanded .map-street-view { right: calc(12px + env(safe-area-inset-right, 0px)); }
 /* Leaflet's corners keep clear of a phone's notch and home bar, and of the card at the foot once a site is placed. */
 .map-frame.expanded .leaflet-top { top: env(safe-area-inset-top, 0px); }
 .map-frame.expanded .leaflet-left { left: env(safe-area-inset-left, 0px); }

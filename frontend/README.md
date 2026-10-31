@@ -123,17 +123,15 @@ its place, and the rest of the app keeps working.
 traced walk or drive (Valhalla, from the API), the site and the open category's pins (`pinLayer.ts`, keyboard-reachable,
 labeled). It grows full screen from the brief and from its dock beside a survey; reduced motion turns its animations off.
 
-The optional **3D buildings** mode loads `map/RealisticMap.tsx`, MapLibre and its local hashed worker only after the
-visitor selects it. OpenFreeMap supplies real OpenStreetMap streets and mapped building heights (coverage and
-estimated heights are disclosed). The 2D map remains mounted and available; 3D failures show a message and a way back.
-Both views reuse the same reach, site, category pins and taste cells without extra Qloo requests. List-to-map actions
-return to 2D for its existing focus and card behavior. Street View opens Google Maps externally without an API key;
-it does not embed Google imagery or promise coverage. CSP allows only the tile provider and a same-origin worker.
+Street View is a small bottom-right button, opening Google Maps externally without an API key; it does not embed
+Google imagery or promise coverage. Measured panel clearance keeps it above attribution, the legend and open cards
+instead of covering the site controls. The map uses only the 2D renderer, without a 3D dependency, worker or mode switcher.
 
-The view selector is a compact bottom-right pill; measured panel clearance keeps it above attribution, the legend
-and open cards instead of covering the site controls. Mouse hover on a pin opens a compact preview after 160 ms in
-both views; a short dismissal delay lets the pointer enter the card. Clicking, tapping or pressing Enter/Space opens
-the full persistent card. Keyboard/list highlighting is separate from hover, and no external page opens automatically.
+Mouse hover on a pin opens a compact preview after 160 ms; a short dismissal delay lets the pointer enter the card.
+Clicking, tapping or pressing Enter/Space saves the selection and opens the full card. Hovering another pin temporarily
+previews it; leaving the pin and card returns to the saved selection, or closes the preview when nothing was selected.
+Clicking another pin or choosing **View details** replaces the saved selection. Keyboard/list highlighting is separate
+from hover, and no external page opens automatically.
 
 Concept cards have a direct **Free launch kit** action, reusing the existing idempotent kit endpoint without first
 opening a design sheet. Gap scores are labelled `/100`, never a success probability. The displayed favorite-place

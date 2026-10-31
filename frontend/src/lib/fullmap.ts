@@ -55,6 +55,11 @@ export function googleMapsUrl(lat: number, lon: number): string {
   return `https://www.google.com/maps/search/?api=1&query=${lat.toFixed(6)},${lon.toFixed(6)}`;
 }
 
+export function streetViewUrl(lat: number, lon: number): string {
+  const query = new URLSearchParams({ api: "1", map_action: "pano", viewpoint: `${lat.toFixed(6)},${lon.toFixed(6)}` });
+  return `https://www.google.com/maps/@?${query}`;
+}
+
 /**
  * What a search box says once a site is set, however it was set (SearchBox.tsx): the site's name, or nothing for a pin
  * placed by hand until its address comes, since its coordinates are no address to search for.
@@ -78,8 +83,8 @@ export function isFullMapEntry(state: unknown): boolean {
 
 type MapBox = Pick<DOMRect, "left" | "right" | "top" | "bottom">;
 
-/** Leave attribution readable and lift the small switcher only above panels that share its corner. */
-export function mapModeBottom(view: MapBox, control: MapBox, panels: MapBox[]): number {
+/** Leave attribution readable and lift the Street View button only above panels that share its corner. */
+export function mapLinkBottom(view: MapBox, control: MapBox, panels: MapBox[]): number {
   const height = control.bottom - control.top;
   let clearance = 52;
   for (const panel of [...panels].sort((a, b) => b.top - a.top)) {

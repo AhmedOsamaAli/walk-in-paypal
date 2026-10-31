@@ -1,7 +1,7 @@
 # Security headers for the web app on Cloudflare Pages: the policy vite.config.ts previews and the backend sends with
 # the app it serves. API responses come from the backend (functions/api) with its own headers.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client https://www.sandbox.paypal.com https://www.paypal.com; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://accounts.google.com/gsi/ https://www.sandbox.paypal.com https://www.paypal.com https://tiles.openfreemap.org; worker-src 'self'; frame-src https://accounts.google.com/gsi/ https://www.sandbox.paypal.com https://www.paypal.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client https://www.sandbox.paypal.com https://www.paypal.com; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://accounts.google.com/gsi/ https://www.sandbox.paypal.com https://www.paypal.com; frame-src https://accounts.google.com/gsi/ https://www.sandbox.paypal.com https://www.paypal.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
   Cross-Origin-Opener-Policy: same-origin-allow-popups
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin

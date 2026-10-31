@@ -1,12 +1,10 @@
-import { Suspense, useCallback, useEffect, useEffectEvent, useRef, useState, type KeyboardEvent } from "react";
-import type { GapRow, HeatCell, PlaceCard as Place, Walk } from "../api/types";
-import { ErrorBoundary } from "../components/ErrorBoundary";
-import { lazyComponent, lazyModule } from "../lib/lazy";
+import { useEffect, useEffectEvent, useRef, useState, type KeyboardEvent } from "react";
+import type { GapRow, PlaceCard as Place, Walk } from "../api/types";
 import { PlaceCard } from "../components/PlaceCard";
 import { SearchBox } from "../components/SearchBox";
 import { areaKey, areaShort, km2Text, walkShort, type Area } from "../lib/area";
 import { cx } from "../lib/css";
-import { FULL_MAP_ENTRY, isFullMapEntry, mapModeBottom, spotTitle } from "../lib/fullmap";
+import { FULL_MAP_ENTRY, isFullMapEntry, mapLinkBottom, spotTitle, streetViewUrl } from "../lib/fullmap";
 import { NO_WALK, walkLine, type WalkPreview } from "../lib/walk";
 import { useEngine } from "../state/engine";
 import type { Theme } from "../state/theme";
@@ -14,11 +12,6 @@ import { BlueprintMap, type MapPoint } from "./controller";
 import { Legend } from "./Legend";
 import { openPin, pinFocus, subscribePins } from "./pinFocus";
 import { areaWord, gapPins, type Pin } from "./pins";
-import { streetViewUrl } from "./realistic";
-import { circleWalk } from "./geometry";
-
-const realMap = lazyModule(() => import("./RealisticMap"));
-const RealisticMap = lazyComponent(realMap, (module) => module.RealisticMap);
 
 /** Where the docked map is a strip at the top of the results, and a tap on it opens it full screen (pins.css). */
 const STRIP = "(max-width: 980px)";
@@ -97,7 +90,7 @@ export function SurveyMap({
   const canvas = useRef<HTMLDivElement>(null);
   const readout = useRef<HTMLDivElement>(null);
   const card = useRef<HTMLDivElement>(null);
-  const modes = useRef<HTMLDivElement>(null);
+  const streetLink = useRef<HTMLAnchorElement>(null);
   const controller = useRef<BlueprintMap | null>(null);
   /** The last input was a click or a tap rather than a key. */
   const pointer = useRef(false);
@@ -112,18 +105,17 @@ export function SurveyMap({
    * The pin whose card is open, for the category it belongs to (another category closes it), whether the keyboard
    * opened it, and the list's mark that asked for it, which takes focus back as it closes.
    */
-  const [opened, setOpened] = useState<{ pin: Pin; byKeyboard: boolean; gap: GapRow; from: HTMLElement | null; preview?: boolean } | null>(null);
-  const shown = opened?.gap === gap ? opened : null;
+  const [opened, setOpened] = useState<{ pin: Pin; byKeyboard: boolean; gap: GapRow; from: HTMLElement | null } | null>(null);
+  const [previewed, setPreviewed] = useState<{ pin: Pin; gap: GapRow } | null>(null);
+  const selected = opened?.gap === gap ? opened : null;
+  const preview = previewed?.gap === gap ? previewed : null;
+  const shown = preview ? { ...preview, byKeyboard: false, from: null, preview: true } :
+    selected ? { ...selected, preview: false } : null;
   const previewTimer = useRef<number | null>(null);
   const dismissTimer = useRef<number | null>(null);
   const overCard = useRef(false);
   /** The open category's taste grid is on the map, so the legend lists it. */
   const [grid, setGrid] = useState(false);
-  const [cells, setCells] = useState<HeatCell[]>([]);
-  const [realistic, setRealistic] = useState(false);
-  const [mapError, setMapError] = useState<string | null>(null);
-  const failed3D = useCallback((message: string) => { setMapError(message); }, []);
-  if (!site && realistic) setRealistic(false);
   /** The docked strip has scrolled out of view: the Map button floats at the foot (phones and tablets). */
   const [away, setAway] = useState(false);
   // A map that can no longer grow (the brief gave way to a survey) is not left full screen.
@@ -140,30 +132,30 @@ export function SurveyMap({
 
   function schedulePreview(key: string | null) {
     clearPreviewTimers();
-    if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches || (shown && !shown.preview)) return;
+    if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
     if (!key) {
       dismissTimer.current = window.setTimeout(() => {
-        if (!overCard.current && shown?.preview) { setOpened(null); openPin(null); }
+        if (!overCard.current && preview) {
+          setPreviewed(null);
+          openPin(selected?.pin.key ?? null);
+        }
       }, 240);
       return;
     }
     if (!gap || (!full && window.matchMedia(STRIP).matches)) return;
+    if (key === selected?.pin.key) {
+      setPreviewed(null);
+      openPin(key);
+      return;
+    }
     const pin = gapPins(gap).pins.find((item) => item.key === key);
     if (!pin) return;
     previewTimer.current = window.setTimeout(() => {
-      setOpened({ pin, byKeyboard: false, gap, from: null, preview: true });
+      setPreviewed({ pin, gap });
       openPin(pin.key);
     }, 160);
   }
   const hoverPin = useEffectEvent(schedulePreview);
-
-  function changeMapMode(next: boolean) {
-    clearPreviewTimers();
-    overCard.current = false;
-    if (shown?.preview) { setOpened(null); openPin(null); }
-    setMapError(null);
-    setRealistic(next);
-  }
 
   function grow() {
     const active = document.activeElement;
@@ -183,17 +175,18 @@ export function SurveyMap({
   function closeCard() {
     clearPreviewTimers();
     overCard.current = false;
+    if (preview) {
+      setPreviewed(null);
+      openPin(selected?.pin.key ?? null);
+      return;
+    }
     const closing = shown;
     setOpened(null);
     openPin(null);
     if (!closing) return;
     // Full screen, the page under the map is inert: focus stays on the map until it shrinks.
     if (!full && closing.from?.isConnected) closing.from.focus({ preventScroll: true });
-    else if (closing.byKeyboard) {
-      if (realistic) [...frame.current?.querySelectorAll<HTMLButtonElement>(".realistic-pin") ?? []]
-        .find((pin) => pin.dataset.pinKey === closing.pin.key)?.focus({ preventScroll: true });
-      else controller.current?.focusPin(closing.pin.key);
-    }
+    else if (closing.byKeyboard) controller.current?.focusPin(closing.pin.key);
   }
 
   /** A pin was pressed, or a list asked for one: its card opens, from the keyboard with focus in it. */
@@ -201,6 +194,7 @@ export function SurveyMap({
     clearPreviewTimers();
     overCard.current = false;
     if (!gap) return;
+    setPreviewed(null);
     setOpened({ pin, byKeyboard, gap, from: null });
     openPin(pin.key);
     // The strip has no room for the card: the map opens full screen with it.
@@ -211,7 +205,7 @@ export function SurveyMap({
   const reveal = useEffectEvent((key: string, byKeyboard: boolean) => {
     clearPreviewTimers();
     overCard.current = false;
-    setRealistic(false);
+    setPreviewed(null);
     const pin = controller.current?.revealPin(key);
     if (!pin || !gap) return;
     const strip = window.matchMedia(STRIP).matches;
@@ -257,9 +251,8 @@ export function SurveyMap({
         onPin: (pin, byKeyboard) => {
           select(pin, byKeyboard);
         },
-        onGrid: (drawn, heat = []) => {
+        onGrid: (drawn) => {
           setGrid(drawn);
-          setCells(heat);
         },
       },
     );
@@ -399,20 +392,20 @@ export function SurveyMap({
   // Full screen, the card floats over the map: the map moves so the pin it describes is not under it.
   const openKey = shown?.pin.key ?? null;
   useEffect(() => {
-    if (!openKey || !full || shown?.preview || realistic) return;
+    if (!openKey || !full || shown?.preview) return;
     const box = frame.current?.querySelector(".place-card")?.getBoundingClientRect();
     if (box) controller.current?.uncoverPin(openKey, box);
-  }, [openKey, full, shown?.preview, realistic]);
+  }, [openKey, full, shown?.preview]);
 
   useEffect(() => {
-    const root = frame.current, controls = modes.current, map = canvas.current;
+    const root = frame.current, controls = streetLink.current, map = canvas.current;
     if (!root || !controls || !map) return;
     const measure = () => {
       const view = full || !surveying ? root.getBoundingClientRect() : map.getBoundingClientRect();
       const panelBoxes = [...root.querySelectorAll<HTMLElement>(".place-card, .map-card, .legend, .credits, .leaflet-control-scale")]
         .filter((panel) => panel.getClientRects().length > 0).map((panel) => panel.getBoundingClientRect());
-      const offset = root.getBoundingClientRect().bottom - view.bottom + mapModeBottom(view, controls.getBoundingClientRect(), panelBoxes);
-      root.style.setProperty("--map-modes-bottom", `${Math.round(offset)}px`);
+      const offset = root.getBoundingClientRect().bottom - view.bottom + mapLinkBottom(view, controls.getBoundingClientRect(), panelBoxes);
+      root.style.setProperty("--map-link-bottom", `${Math.round(offset)}px`);
     };
     const observer = new ResizeObserver(measure);
     observer.observe(root);
@@ -421,7 +414,7 @@ export function SurveyMap({
     root.addEventListener("toggle", measure, true);
     measure();
     return () => { observer.disconnect(); root.removeEventListener("toggle", measure, true); };
-  }, [full, surveying, openKey, shown?.preview, hasCard, realistic]);
+  }, [full, surveying, openKey, shown?.preview, hasCard, spot]);
 
   // Where the docked map is a strip at the top of the results, the Map button floats once it has scrolled away.
   useEffect(() => {
@@ -471,6 +464,7 @@ export function SurveyMap({
   }
 
   const title = site ? spotTitle(label, site.lat, site.lon) : null;
+  const streetSite = site ? (shown?.pin ?? site) : null;
   const area = areaWord(walk?.travel ?? asked.travel);
   const line = walkLine(trace, asked, waking);
   /** The map's own key, at its bottom-left once a site is placed: what its dashed ring is, traced or on its way. */
@@ -488,7 +482,6 @@ export function SurveyMap({
         className={cx("map-frame", full && "expanded")}
         data-expandable={expandable ? "" : undefined}
         data-dock={surveying && !full ? "" : undefined}
-        data-map-mode={realistic ? "3d" : "2d"}
         role={full ? "dialog" : "region"}
         aria-modal={full ? true : undefined}
         aria-label={full ? "Full-screen map" : "Map of the site and its surroundings"}
@@ -507,8 +500,6 @@ export function SurveyMap({
         <div
           ref={canvas}
           className="map-canvas"
-          aria-hidden={realistic}
-          inert={realistic}
           onKeyDown={(event) => {
             // Enter places the site at the cross in the middle, for the keyboard.
             if (event.key !== "Enter" || event.target !== event.currentTarget || !pinnable) return;
@@ -517,25 +508,12 @@ export function SurveyMap({
             if (center) onPick(center);
           }}
         />
-        {realistic && site ? <ErrorBoundary fallback={<p className="realistic-notice" role="alert">The 3D view could not load. Choose 2D to continue.</p>}>
-          <Suspense fallback={<p className="realistic-notice" role="status">Loading the optional 3D renderer…</p>}>
-            <RealisticMap site={site} walk={walk ?? circleWalk(site.lat, site.lon, asked)} gap={gap} cells={cells}
-              pinnable={pinnable} onPick={(lat, lon) => { if (pinnable) onPick({ lat, lon }); }}
-              onPin={selectPin} onError={failed3D} />
-          </Suspense>
-        </ErrorBoundary> : null}
-        {mapError && realistic ? <p className="realistic-notice" role="alert">{mapError}{" "}
-          <button type="button" onClick={() => { changeMapMode(false); }}>Return to 2D</button></p> : null}
-        <div ref={modes} className="map-modes" role="group" aria-label="Map view">
-          <button type="button" aria-label="2D" title="2D evidence map" aria-pressed={!realistic} onClick={() => { changeMapMode(false); }}>2D</button>
-          <button type="button" aria-label="3D buildings" aria-pressed={realistic} disabled={!site}
-            title={site ? "Optional mapped buildings and streets" : "Choose a site before opening 3D"}
-            onClick={() => { changeMapMode(true); }}>3D</button>
-          {site ? <a href={streetViewUrl(shown?.pin ?? site)} title="Open Street View in Google Maps" aria-label="Street View"
-            target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="5" r="2" /><path d="M8 11L12 8L16 11M12 8V16M12 16L9 21M12 16L15 21" />
-            </svg></a> : null}
-        </div>
+        {streetSite ? <a ref={streetLink} className="map-street-view" href={streetViewUrl(streetSite.lat, streetSite.lon)}
+          title="Open Street View in Google Maps" aria-label="Street View" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="5" r="2" /><path d="M8 11L12 8L16 11M12 8V16M12 16L9 21M12 16L15 21" />
+          </svg>
+        </a> : null}
         <div ref={readout} className="readout mono" aria-hidden="true" />
         {pinnable ? (
           <>

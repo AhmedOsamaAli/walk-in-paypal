@@ -5,32 +5,39 @@ import {
   FULL_MAP_ENTRY,
   googleMapsUrl,
   isFullMapEntry,
-  mapModeBottom,
+  mapLinkBottom,
   searchText,
   SITE_ZOOM,
   siteName,
   spotTitle,
   STREET_ZOOM,
   streetZoom,
+  streetViewUrl,
   unnamed,
   walkReach,
 } from "./fullmap";
 
-describe("the compact bottom-right mode switcher", () => {
+describe("the compact bottom-right Street View link", () => {
   const view = { left: 0, right: 390, top: 0, bottom: 844 };
   const control = { left: 278, right: 378, top: 700, bottom: 738 };
   it("keeps its normal clearance above attribution when no panel shares its corner", () => {
-    expect(mapModeBottom(view, control, [])).toBe(52);
-    expect(mapModeBottom(view, control, [{ left: 8, right: 240, top: 650, bottom: 820 }])).toBe(52);
+    expect(mapLinkBottom(view, control, [])).toBe(52);
+    expect(mapLinkBottom(view, control, [{ left: 8, right: 240, top: 650, bottom: 820 }])).toBe(52);
   });
   it("moves above an overlapping mobile card and stacked legend, independently of DOM order", () => {
     const panels = [{ left: 8, right: 382, top: 520, bottom: 804 }, { left: 8, right: 330, top: 700, bottom: 840 }];
-    expect(mapModeBottom(view, control, panels)).toBe(334);
-    expect(mapModeBottom(view, control, [...panels].reverse())).toBe(334);
+    expect(mapLinkBottom(view, control, panels)).toBe(334);
+    expect(mapLinkBottom(view, control, [...panels].reverse())).toBe(334);
   });
   it("ignores the legend below the docked map and keeps the pill inside a short viewport", () => {
-    expect(mapModeBottom({ ...view, bottom: 220 }, control, [{ left: 0, right: 390, top: 220, bottom: 450 }])).toBe(52);
-    expect(mapModeBottom({ ...view, bottom: 100 }, control, [{ left: 0, right: 390, top: 0, bottom: 100 }])).toBe(50);
+    expect(mapLinkBottom({ ...view, bottom: 220 }, control, [{ left: 0, right: 390, top: 220, bottom: 450 }])).toBe(52);
+    expect(mapLinkBottom({ ...view, bottom: 100 }, control, [{ left: 0, right: 390, top: 0, bottom: 100 }])).toBe(50);
+  });
+  it("uses a public Google Maps URL without embedding imagery or requiring an API key", () => {
+    const url = new URL(streetViewUrl(30.26, -97.72));
+    expect(url.searchParams.get("map_action")).toBe("pano");
+    expect(url.searchParams.get("viewpoint")).toBe("30.260000,-97.720000");
+    expect(url.searchParams.has("key")).toBe(false);
   });
 });
 

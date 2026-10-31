@@ -382,7 +382,7 @@ def test_the_app_gets_one_policy_wherever_it_is_served():
     assert pages == preview == CONTENT_SECURITY_POLICY
     policy = dict(part.strip().split(" ", 1) for part in CONTENT_SECURITY_POLICY.split(";"))
     assert policy["script-src"] == f"'self' {GOOGLE_SIGN_IN}client {PAYPAL}" and policy["font-src"] == "'self'"
-    assert policy["connect-src"] == f"'self' {GOOGLE_SIGN_IN} {PAYPAL} https://tiles.openfreemap.org"
+    assert policy["connect-src"] == f"'self' {GOOGLE_SIGN_IN} {PAYPAL}"
     assert policy["frame-src"] == f"{GOOGLE_SIGN_IN} {PAYPAL}"
-    assert policy["worker-src"] == "'self'"  # The optional map's worker is a local hashed asset, never a blob or remote script.
+    assert "worker-src" not in policy
     assert PAYPAL == "https://www.sandbox.paypal.com https://www.paypal.com"
