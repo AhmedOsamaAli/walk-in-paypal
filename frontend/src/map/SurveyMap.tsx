@@ -6,14 +6,14 @@ import { PlaceCard } from "../components/PlaceCard";
 import { SearchBox } from "../components/SearchBox";
 import { areaKey, areaShort, km2Text, walkShort, type Area } from "../lib/area";
 import { cx } from "../lib/css";
-import { FULL_MAP_ENTRY, isFullMapEntry, spotTitle } from "../lib/fullmap";
+import { FULL_MAP_ENTRY, isFullMapEntry, mapModeBottom, spotTitle } from "../lib/fullmap";
 import { NO_WALK, walkLine, type WalkPreview } from "../lib/walk";
 import { useEngine } from "../state/engine";
 import type { Theme } from "../state/theme";
 import { BlueprintMap, type MapPoint } from "./controller";
 import { Legend } from "./Legend";
 import { openPin, pinFocus, subscribePins } from "./pinFocus";
-import { areaWord, type Pin } from "./pins";
+import { areaWord, gapPins, type Pin } from "./pins";
 import { streetViewUrl } from "./realistic";
 import { circleWalk } from "./geometry";
 
@@ -97,6 +97,7 @@ export function SurveyMap({
   const canvas = useRef<HTMLDivElement>(null);
   const readout = useRef<HTMLDivElement>(null);
   const card = useRef<HTMLDivElement>(null);
+  const modes = useRef<HTMLDivElement>(null);
   const controller = useRef<BlueprintMap | null>(null);
   /** The last input was a click or a tap rather than a key. */
   const pointer = useRef(false);
@@ -111,8 +112,11 @@ export function SurveyMap({
    * The pin whose card is open, for the category it belongs to (another category closes it), whether the keyboard
    * opened it, and the list's mark that asked for it, which takes focus back as it closes.
    */
-  const [opened, setOpened] = useState<{ pin: Pin; byKeyboard: boolean; gap: GapRow; from: HTMLElement | null } | null>(null);
+  const [opened, setOpened] = useState<{ pin: Pin; byKeyboard: boolean; gap: GapRow; from: HTMLElement | null; preview?: boolean } | null>(null);
   const shown = opened?.gap === gap ? opened : null;
+  const previewTimer = useRef<number | null>(null);
+  const dismissTimer = useRef<number | null>(null);
+  const overCard = useRef(false);
   /** The open category's taste grid is on the map, so the legend lists it. */
   const [grid, setGrid] = useState(false);
   const [cells, setCells] = useState<HeatCell[]>([]);
@@ -126,6 +130,40 @@ export function SurveyMap({
   if (expanded && !expandable) setExpanded(false);
   const full = expanded && expandable;
   const pinnable = !surveying;
+
+  function clearPreviewTimers() {
+    if (previewTimer.current !== null) window.clearTimeout(previewTimer.current);
+    if (dismissTimer.current !== null) window.clearTimeout(dismissTimer.current);
+    previewTimer.current = null;
+    dismissTimer.current = null;
+  }
+
+  function schedulePreview(key: string | null) {
+    clearPreviewTimers();
+    if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches || (shown && !shown.preview)) return;
+    if (!key) {
+      dismissTimer.current = window.setTimeout(() => {
+        if (!overCard.current && shown?.preview) { setOpened(null); openPin(null); }
+      }, 240);
+      return;
+    }
+    if (!gap || (!full && window.matchMedia(STRIP).matches)) return;
+    const pin = gapPins(gap).pins.find((item) => item.key === key);
+    if (!pin) return;
+    previewTimer.current = window.setTimeout(() => {
+      setOpened({ pin, byKeyboard: false, gap, from: null, preview: true });
+      openPin(pin.key);
+    }, 160);
+  }
+  const hoverPin = useEffectEvent(schedulePreview);
+
+  function changeMapMode(next: boolean) {
+    clearPreviewTimers();
+    overCard.current = false;
+    if (shown?.preview) { setOpened(null); openPin(null); }
+    setMapError(null);
+    setRealistic(next);
+  }
 
   function grow() {
     const active = document.activeElement;
@@ -143,17 +181,25 @@ export function SurveyMap({
   }
 
   function closeCard() {
+    clearPreviewTimers();
+    overCard.current = false;
     const closing = shown;
     setOpened(null);
     openPin(null);
     if (!closing) return;
     // Full screen, the page under the map is inert: focus stays on the map until it shrinks.
     if (!full && closing.from?.isConnected) closing.from.focus({ preventScroll: true });
-    else if (closing.byKeyboard) controller.current?.focusPin(closing.pin.key);
+    else if (closing.byKeyboard) {
+      if (realistic) [...frame.current?.querySelectorAll<HTMLButtonElement>(".realistic-pin") ?? []]
+        .find((pin) => pin.dataset.pinKey === closing.pin.key)?.focus({ preventScroll: true });
+      else controller.current?.focusPin(closing.pin.key);
+    }
   }
 
   /** A pin was pressed, or a list asked for one: its card opens, from the keyboard with focus in it. */
   function selectPin(pin: Pin, byKeyboard: boolean) {
+    clearPreviewTimers();
+    overCard.current = false;
     if (!gap) return;
     setOpened({ pin, byKeyboard, gap, from: null });
     openPin(pin.key);
@@ -163,6 +209,8 @@ export function SurveyMap({
   const select = useEffectEvent(selectPin);
   /** A list's mark asks for its place: the docked map shows its card, or, where the map is a strip, opens full screen. */
   const reveal = useEffectEvent((key: string, byKeyboard: boolean) => {
+    clearPreviewTimers();
+    overCard.current = false;
     setRealistic(false);
     const pin = controller.current?.revealPin(key);
     if (!pin || !gap) return;
@@ -218,14 +266,20 @@ export function SurveyMap({
     controller.current = map;
     // A list's mark asks the map to show its place (GapItem.tsx).
     let asks = pinFocus().asks;
+    let hovered = pinFocus().hovered;
     const unsubscribe = subscribePins(() => {
       const focus = pinFocus();
+      if (focus.hovered !== hovered) {
+        hovered = focus.hovered;
+        hoverPin(hovered);
+      }
       if (focus.asks === asks) return;
       asks = focus.asks;
       if (focus.shown) reveal(focus.shown, focus.byKeyboard);
     });
     return () => {
       unsubscribe();
+      clearPreviewTimers();
       map.destroy();
       controller.current = null;
       document.documentElement.classList.remove("map-full");
@@ -336,6 +390,8 @@ export function SurveyMap({
 
   // Another category, or none: its pins replace the last one's, and no card stays lit.
   useEffect(() => {
+    clearPreviewTimers();
+    overCard.current = false;
     controller.current?.showGap(gap);
     openPin(null);
   }, [gap]);
@@ -343,10 +399,29 @@ export function SurveyMap({
   // Full screen, the card floats over the map: the map moves so the pin it describes is not under it.
   const openKey = shown?.pin.key ?? null;
   useEffect(() => {
-    if (!openKey || !full) return;
+    if (!openKey || !full || shown?.preview || realistic) return;
     const box = frame.current?.querySelector(".place-card")?.getBoundingClientRect();
     if (box) controller.current?.uncoverPin(openKey, box);
-  }, [openKey, full]);
+  }, [openKey, full, shown?.preview, realistic]);
+
+  useEffect(() => {
+    const root = frame.current, controls = modes.current, map = canvas.current;
+    if (!root || !controls || !map) return;
+    const measure = () => {
+      const view = full || !surveying ? root.getBoundingClientRect() : map.getBoundingClientRect();
+      const panelBoxes = [...root.querySelectorAll<HTMLElement>(".place-card, .map-card, .legend, .credits, .leaflet-control-scale")]
+        .filter((panel) => panel.getClientRects().length > 0).map((panel) => panel.getBoundingClientRect());
+      const offset = root.getBoundingClientRect().bottom - view.bottom + mapModeBottom(view, controls.getBoundingClientRect(), panelBoxes);
+      root.style.setProperty("--map-modes-bottom", `${Math.round(offset)}px`);
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(root);
+    observer.observe(controls);
+    for (const panel of root.querySelectorAll(".place-card, .map-card, .legend, .credits")) observer.observe(panel);
+    root.addEventListener("toggle", measure, true);
+    measure();
+    return () => { observer.disconnect(); root.removeEventListener("toggle", measure, true); };
+  }, [full, surveying, openKey, shown?.preview, hasCard, realistic]);
 
   // Where the docked map is a strip at the top of the results, the Map button floats once it has scrolled away.
   useEffect(() => {
@@ -450,13 +525,16 @@ export function SurveyMap({
           </Suspense>
         </ErrorBoundary> : null}
         {mapError && realistic ? <p className="realistic-notice" role="alert">{mapError}{" "}
-          <button type="button" onClick={() => { setRealistic(false); setMapError(null); }}>Return to 2D</button></p> : null}
-        <div className="map-modes" role="group" aria-label="Map view">
-          <button type="button" aria-pressed={!realistic} onClick={() => { setRealistic(false); setMapError(null); }}>2D</button>
-          <button type="button" aria-pressed={realistic} disabled={!site}
+          <button type="button" onClick={() => { changeMapMode(false); }}>Return to 2D</button></p> : null}
+        <div ref={modes} className="map-modes" role="group" aria-label="Map view">
+          <button type="button" aria-label="2D" title="2D evidence map" aria-pressed={!realistic} onClick={() => { changeMapMode(false); }}>2D</button>
+          <button type="button" aria-label="3D buildings" aria-pressed={realistic} disabled={!site}
             title={site ? "Optional mapped buildings and streets" : "Choose a site before opening 3D"}
-            onClick={() => { setMapError(null); setRealistic(true); }}>3D buildings</button>
-          {site ? <a href={streetViewUrl(shown?.pin ?? site)} target="_blank" rel="noopener noreferrer">Street View ↗</a> : null}
+            onClick={() => { changeMapMode(true); }}>3D</button>
+          {site ? <a href={streetViewUrl(shown?.pin ?? site)} title="Open Street View in Google Maps" aria-label="Street View"
+            target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="5" r="2" /><path d="M8 11L12 8L16 11M12 8V16M12 16L9 21M12 16L15 21" />
+            </svg></a> : null}
         </div>
         <div ref={readout} className="readout mono" aria-hidden="true" />
         {pinnable ? (
@@ -514,7 +592,11 @@ export function SurveyMap({
             </button>
           </div>
         ) : null}
-        {shown ? <PlaceCard pin={shown.pin} area={area} focus={shown.byKeyboard} onClose={closeCard} /> : null}
+        {shown ? <PlaceCard pin={shown.pin} area={area} focus={shown.byKeyboard} compact={shown.preview}
+          onExpand={() => { selectPin(shown.pin, false); }}
+          onPointerEnter={() => { overCard.current = true; clearPreviewTimers(); }}
+          onPointerLeave={() => { overCard.current = false; schedulePreview(null); }}
+          onClose={closeCard} /> : null}
         {surveying ? (
           <Legend
             areaLabel={walk ? walkShort(walk) : areaShort(asked)}

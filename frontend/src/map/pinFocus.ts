@@ -6,6 +6,8 @@ import { useSyncExternalStore } from "react";
 export interface PinFocus {
   /** Hovered or focused, in a list or on the map. */
   lit: string | null;
+  /** Mouse over a map badge only; keyboard focus must not open a hover card. */
+  hovered: string | null;
   /** The pin whose card is open on the map. */
   open: string | null;
   /** The last pin a list asked the map to show; `asks` counts the requests, so asking again shows it again. */
@@ -15,13 +17,14 @@ export interface PinFocus {
   byKeyboard: boolean;
 }
 
-let state: PinFocus = { lit: null, open: null, shown: null, asks: 0, byKeyboard: false };
+let state: PinFocus = { lit: null, hovered: null, open: null, shown: null, asks: 0, byKeyboard: false };
 const listeners = new Set<() => void>();
 
 function update(next: Partial<PinFocus>): void {
   const merged = { ...state, ...next };
   if (
     merged.lit === state.lit &&
+    merged.hovered === state.hovered &&
     merged.open === state.open &&
     merged.shown === state.shown &&
     merged.asks === state.asks &&
@@ -35,6 +38,10 @@ function update(next: Partial<PinFocus>): void {
 
 export function lightPin(key: string | null): void {
   update({ lit: key });
+}
+
+export function setPinHover(key: string | null): void {
+  update({ hovered: key });
 }
 
 export function openPin(key: string | null): void {

@@ -26,10 +26,14 @@ interface PlaceCardProps {
   /** Opened from the keyboard: focus moves into the card, and Esc or Close returns it to the pin. */
   focus: boolean;
   onClose: () => void;
+  compact?: boolean;
+  onExpand?: () => void;
+  onPointerEnter?: () => void;
+  onPointerLeave?: () => void;
 }
 
-/** A tapped or clicked pin's card: what the place is, why it is on the map, and a link to its own website or menu. */
-export function PlaceCard({ pin, area = AREA, focus, onClose }: PlaceCardProps) {
+/** A compact hover preview, or the full card after explicit activation; external links always require a click. */
+export function PlaceCard({ pin, area = AREA, focus, onClose, compact = false, onExpand, onPointerEnter, onPointerLeave }: PlaceCardProps) {
   const root = useRef<HTMLDivElement>(null);
   const title = useId();
   const place = pin.place;
@@ -55,11 +59,13 @@ export function PlaceCard({ pin, area = AREA, focus, onClose }: PlaceCardProps) 
   return (
     <div
       ref={root}
-      className={cx("place-card", pin.role)}
+      className={cx("place-card", pin.role, compact && "preview")}
       role="dialog"
       aria-labelledby={title}
       tabIndex={-1}
       onKeyDown={keyDown}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
     >
       <div className="pc-head">
         <PinMark mark={pin.mark} role={pin.role} />
@@ -76,13 +82,13 @@ export function PlaceCard({ pin, area = AREA, focus, onClose }: PlaceCardProps) 
         </button>
       </div>
       {rated ? <p className="pc-rated mono">{rated}</p> : null}
-      {known.length ? <p className="pc-known">Known for {naturalList(known)}.</p> : null}
-      {complaints.length ? (
+      {!compact && known.length ? <p className="pc-known">Known for {naturalList(known)}.</p> : null}
+      {!compact && complaints.length ? (
         <p className="pc-said">
           <span className="pc-said-lead">Reviews complain about</span> <span className="hl">{naturalList(complaints)}</span>.
         </p>
       ) : null}
-      {pin.osm ? (
+      {!compact && pin.osm ? (
         <p className="pc-known">
           Qloo doesn&apos;t list it here, so nothing is known of its ratings or reviews
           {pin.osm.tag ? <span className="pc-tag mono"> · {pin.osm.tag}</span> : null}.
@@ -103,6 +109,7 @@ export function PlaceCard({ pin, area = AREA, focus, onClose }: PlaceCardProps) 
         </a>
       ) : null}
       {source ? <p className="pc-source mono">{source}</p> : null}
+      {compact && onExpand ? <button className="pc-details" type="button" onClick={onExpand}>View details</button> : null}
       {pin.osm ? (
         <p className="pc-source mono">
           Map data{" "}

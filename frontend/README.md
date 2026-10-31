@@ -130,6 +130,11 @@ Both views reuse the same reach, site, category pins and taste cells without ext
 return to 2D for its existing focus and card behavior. Street View opens Google Maps externally without an API key;
 it does not embed Google imagery or promise coverage. CSP allows only the tile provider and a same-origin worker.
 
+The view selector is a compact bottom-right pill; measured panel clearance keeps it above attribution, the legend
+and open cards instead of covering the site controls. Mouse hover on a pin opens a compact preview after 160 ms in
+both views; a short dismissal delay lets the pointer enter the card. Clicking, tapping or pressing Enter/Space opens
+the full persistent card. Keyboard/list highlighting is separate from hover, and no external page opens automatically.
+
 Concept cards have a direct **Free launch kit** action, reusing the existing idempotent kit endpoint without first
 opening a design sheet. Gap scores are labelled `/100`, never a success probability. The displayed favorite-place
 percentage is calculated only from valid actual counts and identifies its sample and denominator, not residents.

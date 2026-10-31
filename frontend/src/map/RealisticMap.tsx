@@ -6,6 +6,7 @@ import type { GapRow, HeatCell, Walk } from "../api/types";
 import type { MapPoint } from "./controller";
 import { gapPins, type Pin } from "./pins";
 import { realisticFeatures } from "./realistic";
+import { lightPin, pinFocus, setPinHover } from "./pinFocus";
 
 setWorkerUrl(workerUrl);
 setWorkerCount(1);
@@ -109,12 +110,28 @@ export function RealisticMap({ site, walk, gap, cells, pinnable, onPick, onPin, 
       button.type = "button";
       button.className = "realistic-pin";
       button.dataset.role = pin.role;
+      button.dataset.pinKey = pin.key;
       button.textContent = pin.mark;
       button.setAttribute("aria-label", `${pin.mark}: ${pin.name}`);
+      const off = () => { if (pinFocus().lit === pin.key) lightPin(null); };
+      button.addEventListener("pointerenter", (event) => {
+        if (event.pointerType === "mouse") { lightPin(pin.key); setPinHover(pin.key); }
+      });
+      button.addEventListener("pointerleave", (event) => {
+        if (event.pointerType === "mouse") {
+          off();
+          if (pinFocus().hovered === pin.key) setPinHover(null);
+        }
+      });
+      button.addEventListener("focus", () => { lightPin(pin.key); });
+      button.addEventListener("blur", off);
       button.addEventListener("click", (event) => { event.stopPropagation(); select(pin, event.detail === 0); });
       return new Marker({ element: button }).setLngLat([pin.lon, pin.lat]).addTo(map);
     });
-    return () => { for (const marker of markers) marker.remove(); };
+    return () => {
+      if (pins.some((pin) => pin.key === pinFocus().hovered)) setPinHover(null);
+      for (const marker of markers) marker.remove();
+    };
   }, [ready, site, walk, gap, cells]);
 
   useEffect(() => {

@@ -108,6 +108,13 @@
 .pc-source { font-size: 9.5px; line-height: 1.45; color: var(--ash); text-transform: none; letter-spacing: .03em; }
 .pc-source a { color: inherit; text-decoration: underline; text-decoration-color: var(--edge); text-underline-offset: 2px; }
 .pc-source a:hover { color: var(--blue); }
+.place-card.preview { gap: 5px; padding: 10px 12px; }
+.place-card.preview .pc-name { font-size: 16px; }
+.place-card.preview .pc-role { font-size: 9px; }
+.place-card.preview .pc-close { width: 25px; height: 25px; margin: -2px -3px 0 0; }
+.place-card.preview .pc-link { min-height: 27px; padding: 0 10px; font-size: 11px; }
+.place-card.preview .pc-source { font-size: 9px; }
+.pc-details { justify-self: start; font-size: 11px; color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
 
 /* Docked beside the results, the card opens under the small map, above the legend. */
 .map-frame[data-dock] .place-card { border-top: var(--rule); }
@@ -118,6 +125,7 @@
   width: min(360px, calc(100% - 32px)); max-height: calc(100% - 180px); overflow: auto;
   border: var(--rule); border-radius: var(--r-m); box-shadow: var(--shadow);
 }
+.map-frame.expanded .place-card.preview { width: min(250px, calc(100% - 32px)); }
 @media (max-width: 560px) {
   .map-frame.expanded .place-card {
     top: auto; left: 8px; right: 8px; bottom: calc(40px + env(safe-area-inset-bottom, 0px));

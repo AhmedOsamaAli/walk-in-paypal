@@ -1,11 +1,11 @@
 /* The open category's pins on the Leaflet map (pins.ts says which and how they are labeled; pins.css draws them). Each
    pin is a keyboard-reachable button: Enter, Space, a click or a tap opens its card, and hovering or focusing it lights
-   the same place in the lists, and the other way round (pinFocus.ts). Badges that would cover each other, the site or
+   the same place in the lists, and mouse hover opens a compact preview (pinFocus.ts). Badges that would cover each other, the site or
    the map's controls step aside, with a short line back to the place, stay inside the map, and are placed again
    whenever the map stops moving. */
 import * as L from "leaflet";
 import type { GapRow } from "../api/types";
-import { lightPin, pinFocus, subscribePins } from "./pinFocus";
+import { lightPin, pinFocus, setPinHover, subscribePins } from "./pinFocus";
 import { AREA, declutter, gapPins, pinLabel, type Box, type Pin, type PinRole } from "./pins";
 
 /** A badge with its ring, in pixels. */
@@ -85,6 +85,8 @@ export class PinLayer {
   }
 
   clear(): void {
+    const hover = pinFocus().hovered;
+    if (hover && this.drawn.has(hover)) setPinHover(null);
     this.group.clearLayers();
     this.drawn.clear();
   }
@@ -151,8 +153,7 @@ export class PinLayer {
     root.style.setProperty("--k", String(order));
     const icon = L.divIcon({ className: "pin-icon", iconSize: [0, 0], html: root });
     const marker = L.marker([pin.lat, pin.lon], { icon, keyboard: true, zIndexOffset: LAYER[pin.role], alt: "" });
-    // No hover box: on a small map it could spill out of the frame. Hovering lights the pin and its row in the list,
-    // and a click opens the place's card under the map.
+    // Hover previews and list highlights share pinFocus; click and keyboard activation open the full card.
     marker.on("click", () => {
       this.onSelect(pin, false);
     });
@@ -173,8 +174,15 @@ export class PinLayer {
       const off = () => {
         if (pinFocus().lit === pin.key) lightPin(null);
       };
-      element.addEventListener("pointerenter", on);
-      element.addEventListener("pointerleave", off);
+      element.addEventListener("pointerenter", (event) => {
+        if (event.pointerType === "mouse") { on(); setPinHover(pin.key); }
+      });
+      element.addEventListener("pointerleave", (event) => {
+        if (event.pointerType === "mouse") {
+          off();
+          if (pinFocus().hovered === pin.key) setPinHover(null);
+        }
+      });
       element.addEventListener("focus", on);
       element.addEventListener("blur", off);
     }

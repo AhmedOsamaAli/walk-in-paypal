@@ -75,3 +75,16 @@ export const FULL_MAP_ENTRY = { walkinFullMap: true } as const;
 export function isFullMapEntry(state: unknown): boolean {
   return typeof state === "object" && state !== null && "walkinFullMap" in state && state.walkinFullMap === true;
 }
+
+type MapBox = Pick<DOMRect, "left" | "right" | "top" | "bottom">;
+
+/** Leave attribution readable and lift the small switcher only above panels that share its corner. */
+export function mapModeBottom(view: MapBox, control: MapBox, panels: MapBox[]): number {
+  const height = control.bottom - control.top;
+  let clearance = 52;
+  for (const panel of [...panels].sort((a, b) => b.top - a.top)) {
+    if (panel.right <= control.left - 8 || panel.left >= control.right + 8 || panel.top >= view.bottom) continue;
+    if (panel.bottom > view.bottom - clearance - height - 8) clearance = Math.max(clearance, view.bottom - panel.top + 10);
+  }
+  return Math.max(12, Math.min(clearance, view.bottom - view.top - height - 12));
+}

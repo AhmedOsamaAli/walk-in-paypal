@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { lightPin, openPin, pinFocus, showPin, subscribePins } from "./pinFocus";
+import { lightPin, openPin, pinFocus, setPinHover, showPin, subscribePins } from "./pinFocus";
 
 describe("pinFocus", () => {
+  it("keeps mouse preview separate from keyboard/list focus", () => {
+    lightPin("keyboard-pin");
+    expect(pinFocus().hovered).toBeNull();
+    setPinHover("mouse-pin");
+    expect(pinFocus().hovered).toBe("mouse-pin");
+    expect(pinFocus().lit).toBe("keyboard-pin");
+    setPinHover(null);
+    lightPin(null);
+  });
   it("lights, opens and asks for pins, telling listeners once per change", () => {
     let calls = 0;
     const stop = subscribePins(() => {
