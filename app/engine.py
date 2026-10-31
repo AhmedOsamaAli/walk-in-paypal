@@ -322,10 +322,31 @@ async def gap_table(
     `checked`: the survey's OpenStreetMap cross-check, or what will give it once OpenStreetMap answers; it is awaited
     only after Qloo's evidence is in, and applied before the rows are scored, so supply counts both maps.
     """
-    candidates = [genre for genre in genres if scoring.matches_focus(genre["name"], focus)][:GAP_GENRES]
+    candidates = gap_candidates(genres, focus)
     rows = list(await asyncio.gather(*(genre_evidence(q, catchment, genre, ages) for genre in candidates)))
     await cross_check(q, rows, await checked if inspect.isawaitable(checked) else checked)
     return scoring.score_gaps(rows, catchment.area_m2, around_area_m2(catchment))
+
+
+def gap_candidates(genres: list[dict], focus: str = "any") -> list[dict]:
+    """Spend the same query budget across the requested sectors, then let measured gap scores decide the winners."""
+    ranked = [genre for genre in genres if scoring.matches_focus(genre["name"], focus)]
+    if focus != "any":
+        return ranked[:GAP_GENRES]
+    picked = ranked[:max(1, GAP_GENRES - 2)]
+    # Food-heavy demand rankings must not prevent retail or leisure from being measured at all.
+    for sector in ("retail", "leisure"):
+        if not any(scoring.matches_focus(genre["name"], sector) for genre in picked):
+            candidate = next((genre for genre in ranked if genre not in picked
+                              and scoring.matches_focus(genre["name"], sector)), None)
+            if candidate is not None and len(picked) < GAP_GENRES:
+                picked.append(candidate)
+    for genre in ranked:
+        if len(picked) >= GAP_GENRES:
+            break
+        if genre not in picked:
+            picked.append(genre)
+    return sorted(picked, key=lambda genre: ranked.index(genre))
 
 
 async def find_genre(q: QlooClient, ranked: list[dict], query: str) -> tuple[dict | None, str | None]:

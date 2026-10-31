@@ -41,8 +41,12 @@ project-appropriate visual direction and palette; `PosterMotif.tsx` draws origin
 subtle contextual shadows. Text and accent-panel contrast are tested at 4.5:1 or better.
 
 New kits and owner-described campaigns use these same adapters; showcase names are not special cases. Automatic
-artwork is deterministic from the business's identity across six art families, not an unlimited AI image or logo
-generator. The automatic mark uses the business's initials; owners can supply their own permitted logo.
+artwork is deterministic, not an unlimited AI image or logo generator. Semantic subjects (pastry, coffee, food,
+seafood, fitness, plants, music, craft, books, beauty and retail) are independent of the six palette/style families.
+The actual business category outranks incidental keywords or a misleading name. Unknown categories get abstract
+art, never an unrelated book. The automatic mark uses initials; owners can supply their own permitted logo.
+Clipped sentences, dangling words and mismatched generic copy are rejected; only existing complete source sentences
+are reused, and a subline does not repeat the headline.
 
 The owner can change the direction and accent, add a permitted raster logo and choose coming-soon versus now-open
 wording. Settings and logos stay on this device; the logo is embedded in downloads, not uploaded. The optional
@@ -118,6 +122,17 @@ its place, and the rest of the app keeps working.
 `map/controller.ts` draws a Leaflet map on Esri's tiles (`server.arcgisonline.com`, preconnected in `index.html`), the
 traced walk or drive (Valhalla, from the API), the site and the open category's pins (`pinLayer.ts`, keyboard-reachable,
 labeled). It grows full screen from the brief and from its dock beside a survey; reduced motion turns its animations off.
+
+The optional **3D buildings** mode loads `map/RealisticMap.tsx`, MapLibre and its local hashed worker only after the
+visitor selects it. OpenFreeMap supplies real OpenStreetMap streets and mapped building heights (coverage and
+estimated heights are disclosed). The 2D map remains mounted and available; 3D failures show a message and a way back.
+Both views reuse the same reach, site, category pins and taste cells without extra Qloo requests. List-to-map actions
+return to 2D for its existing focus and card behavior. Street View opens Google Maps externally without an API key;
+it does not embed Google imagery or promise coverage. CSP allows only the tile provider and a same-origin worker.
+
+Concept cards have a direct **Free launch kit** action, reusing the existing idempotent kit endpoint without first
+opening a design sheet. Gap scores are labelled `/100`, never a success probability. The displayed favorite-place
+percentage is calculated only from valid actual counts and identifies its sample and denominator, not residents.
 
 ## The launch kit
 

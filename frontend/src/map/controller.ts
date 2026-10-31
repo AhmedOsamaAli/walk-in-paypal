@@ -21,7 +21,7 @@ export interface MapOptions {
   /** A pin of the open category was clicked, tapped, or pressed with Enter or Space. */
   onPin?: (pin: Pin, byKeyboard: boolean) => void;
   /** The open category's taste grid is on the map, or no longer is. */
-  onGrid?: (shown: boolean) => void;
+  onGrid?: (shown: boolean, cells?: HeatCell[]) => void;
 }
 
 /**
@@ -96,7 +96,7 @@ export class BlueprintMap {
   private readonly layers: Record<"grid" | "ring" | "gap" | "site", L.LayerGroup>;
   /** The open category's labeled pins. */
   private readonly pins: PinLayer;
-  private readonly onGrid: (shown: boolean) => void;
+  private readonly onGrid: (shown: boolean, cells?: HeatCell[]) => void;
   /** On narrow screens the frame grows for the survey and shrinks back for the brief; Leaflet must re-measure it. */
   private readonly resizer: ResizeObserver;
   private readonly idleQueue: (() => void)[] = [];
@@ -705,7 +705,7 @@ export class BlueprintMap {
           },
         ).addTo(this.layers.grid);
       }
-      this.onGrid(this.layers.grid.getLayers().length > 0);
+      this.onGrid(this.layers.grid.getLayers().length > 0, shown);
       const pane = this.map.getPane("grid");
       pane?.classList.remove("in");
       requestAnimationFrame(() =>

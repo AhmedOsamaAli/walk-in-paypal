@@ -16,6 +16,19 @@ describe("art direction from the business, not a global app template", () => {
     expect(posterBrand("First Tea", "Tea", []).seed).not.toBe(posterBrand("Second Tea", "Tea", []).seed);
   });
 
+  it.each([
+    ["The Daily Grind", "Pâtisserie", ["coffee", "books"], "pastry"],
+    ["Paper & Steam", "Coffee shop", ["reading", "garden"], "coffee"],
+    ["The Reading Room", "Hair salon", ["coffee"], "beauty"],
+    ["Fish & Chips", "Bookstore", ["fish recipes"], "books"],
+    ["Common Ground", "Other", [], "neutral"],
+    ["Little Lantern", "Clothing boutique", [], "retail"],
+    ["Morning Table", "Restaurant", [], "food"],
+  ])("keeps %s artwork about its actual category, not an incidental name or keyword", (name, kind, keywords, subject) => {
+    expect(posterBrand(name, kind, keywords).subject).toBe(subject);
+    expect(posterBrand(name, kind, keywords, "coastal").subject).toBe(subject);
+  });
+
   it("keeps normal text and accent-panel text at readable contrast", () => {
     for (const direction of POSTER_DIRECTIONS) {
       const brand = posterBrand("A business", "", [], direction);

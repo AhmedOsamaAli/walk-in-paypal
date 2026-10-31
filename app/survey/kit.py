@@ -322,6 +322,10 @@ class Facts:
         folded = fold(text)
         spans = [match.span() for pattern in self.own for match in pattern.finditer(folded)]
         masked = self.mask(folded)
+        if re.search(r"\b(?:and|or|the|a|an|our|your|freshly|including|featuring)\s*[,;:.!?]*$|"
+                     r"\b(?:with|for|from|of|to)\s*[,;:]*$",
+                     masked, re.IGNORECASE) or re.search(r"(?:\.{3}|\u2026)$", text.strip()):
+            reasons.append("ends mid-sentence: use a complete line, not clipped copy")
         place = next((name for name in self.places if name.found(folded, spans)), None)
         if place:
             reasons.append(f"names {place.text}, a place near the site: ads must not name other businesses")

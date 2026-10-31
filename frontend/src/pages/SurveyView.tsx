@@ -122,6 +122,7 @@ export function SurveyView({
               rules={survey.understood}
               baseline={survey.baseline}
               onOpen={onOpenDesign}
+              runId={survey.runId}
             />
           </SectionBoundary>
         ) : null;

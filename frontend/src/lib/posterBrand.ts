@@ -3,9 +3,12 @@ import type { PosterInput } from "./poster";
 export const POSTER_DIRECTIONS = ["botanical", "coastal", "kinetic", "editorial", "night", "workshop"] as const;
 export type PosterDirection = (typeof POSTER_DIRECTIONS)[number];
 export type PosterChoice = "auto" | PosterDirection;
+export type PosterSubject = "pastry" | "coffee" | "food" | "seafood" | "fitness" | "botanical" |
+  "music" | "workshop" | "books" | "beauty" | "retail" | "neutral";
 
 export interface PosterBrand {
   direction: PosterDirection;
+  subject: PosterSubject;
   paper: string;
   ink: string;
   accent: string;
@@ -52,18 +55,36 @@ export function posterInk(background: string): string {
   return posterContrast(background, "#111111") >= posterContrast(background, "#ffffff") ? "#111111" : "#ffffff";
 }
 
-function directionOf(words: string): PosterDirection {
-  if (/seafood|oyster|fish|coastal|tostada|anchor|fin\b/i.test(words)) return "coastal";
-  if (/gym|fitness|strength|cardio|training|sport|dance|recovery/i.test(words)) return "kinetic";
-  if (/tea\b|leaf|botanical|plant|garden|wellness|salad|herb/i.test(words)) return "botanical";
-  if (/music|listening|vinyl|taproom|cocktail|night|stage|watch.part|brewery/i.test(words)) return "night";
-  if (/studio|maker|repair|craft|workshop|ceramic/i.test(words)) return "workshop";
-  return "editorial";
+function subjectIn(value: string): PosterSubject | null {
+  const words = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (/\b(?:patisserie|bakery|bakeries|pastr(?:y|ies)|croissant|bread|cake|dessert|gelato|ice cream)\b/.test(words)) return "pastry";
+  if (/\b(?:seafood|oyster|fish|coastal)\b/.test(words)) return "seafood";
+  if (/\b(?:gym|fitness|strength|cardio|sport|dance|pilates|yoga|training|recovery)\b/.test(words)) return "fitness";
+  if (/\b(?:bookstore|bookshop|books?|library|reading)\b/.test(words)) return "books";
+  if (/\b(?:salon|barber|beauty|spa|nail|hair|massage|cosmetics)\b/.test(words)) return "beauty";
+  if (/\b(?:tea|botanical|plant|garden|florist|salad|herb|wellness)\b/.test(words)) return "botanical";
+  if (/\b(?:cafe|coffee|espresso|roaster)\b/.test(words)) return "coffee";
+  if (/\b(?:music|listening|vinyl|taproom|cocktail|bar|night|stage|brewery|pub|venue)\b/.test(words)) return "music";
+  if (/\b(?:studio|maker|repair|craft|workshop|ceramic|pottery|bicycle|bike)\b/.test(words)) return "workshop";
+  if (/\b(?:restaurant|kitchen|bistro|grill|taco|pizza|burger|brunch|breakfast|deli|noodle|food)\b/.test(words)) return "food";
+  if (/\b(?:store|shop|retail|boutique|clothing|fashion|grocery|gift|pet|toy)\b/.test(words)) return "retail";
+  return null;
+}
+
+/** The actual category wins over incidental menu words or a misleading business name. */
+export function posterSubject(name: string, kind: string, keywords: readonly string[]): PosterSubject {
+  return subjectIn(kind) ?? subjectIn(keywords.join(" ")) ?? subjectIn(name) ?? "neutral";
 }
 
 export function posterBrand(name: string, kind: string, keywords: readonly string[], choice: PosterChoice = "auto", accent?: string): PosterBrand {
   if (!name.trim()) throw new Error("A poster needs the business's name.");
-  const direction = choice === "auto" ? directionOf([kind, ...keywords, name].join(" ")) : choice;
+  const subject = posterSubject(name, kind, keywords);
+  const directions: Record<PosterSubject, PosterDirection> = {
+    pastry: "editorial", coffee: "editorial", food: "editorial", seafood: "coastal", fitness: "kinetic",
+    botanical: "botanical", music: "night", workshop: "workshop", books: "editorial", beauty: "botanical",
+    retail: "workshop", neutral: "editorial",
+  };
+  const direction = choice === "auto" ? directions[subject] : choice;
   const palette = PALETTES[direction];
   if (accent !== undefined && !isPosterColor(accent)) throw new Error("The poster accent is not a valid color.");
   let seed = 2166136261;
@@ -72,7 +93,7 @@ export function posterBrand(name: string, kind: string, keywords: readonly strin
   const initials = words.slice(0, 2).map((word) => Array.from(word)[0] ?? "").join("").toUpperCase();
   const color = accent ?? palette.accent;
   return {
-    ...palette, direction, accent: color, accentInk: posterInk(color), seed, initials,
+    ...palette, direction, subject, accent: color, accentInk: posterInk(color), seed, initials,
     face: ["kinetic", "night", "workshop"].includes(direction) ? "sans" : "serif",
     centered: direction === "botanical" || direction === "coastal",
   };

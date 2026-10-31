@@ -4,6 +4,7 @@ import { cssVars, cx } from "../lib/css";
 import { standingText } from "../lib/format";
 import {
   insideShort,
+  favoritesOutsidePercent,
   leadLine,
   OSM_COPYRIGHT,
   OSM_CREDIT,
@@ -200,6 +201,7 @@ interface GapItemProps {
 
 export function GapItem({ gap, index, open, onToggle, area = AREA }: GapItemProps) {
   const local = gap.favorites_kind === "local";
+  const outsidePercent = favoritesOutsidePercent(gap);
   const id = `gap-${index}`;
   const rankHere = gap.demand_rank >= 51 ? "50+" : String(gap.demand_rank);
   const around =
@@ -235,13 +237,13 @@ export function GapItem({ gap, index, open, onToggle, area = AREA }: GapItemProp
         type="button"
         aria-expanded={open}
         aria-controls={`${id}-detail`}
-        aria-label={`${gap.genre}, gap score ${gap.gap_score}${badge ? `, ${badge}` : ""}`}
+        aria-label={`${gap.genre}, gap score ${gap.gap_score} out of 100${badge ? `, ${badge}` : ""}`}
         aria-describedby={`${id}-why`}
         onClick={() => {
           onToggle(index);
         }}
       >
-        <CountUp className="gap-score" value={gap.gap_score} />
+        <span className="gap-score-value"><CountUp className="gap-score" value={gap.gap_score} /><small>/100</small></span>
         <span>
           <span className="gap-name">{gap.genre}</span>
           <span className="gap-meta">
@@ -270,7 +272,7 @@ export function GapItem({ gap, index, open, onToggle, area = AREA }: GapItemProp
             </span>
             <span className="meter">
               <span className="mono">
-                {local ? `Favorites outside · ${gap.favorites_far}/${gap.favorites_total}` : "Favorites of people here"}
+                {local ? `Favorites outside · ${gap.favorites_far}/${gap.favorites_total}${outsidePercent === null ? "" : ` · ${outsidePercent}%`}` : "Favorites of people here"}
               </span>
               <span className="dots">
                 <Dots gap={gap} />
@@ -310,6 +312,8 @@ export function GapItem({ gap, index, open, onToggle, area = AREA }: GapItemProp
             </div>
             <div>
               <h4 className="label mono">{favoritesTitle}</h4>
+              {outsidePercent !== null ? <p className="gap-sample-note">{outsidePercent}% of the {gap.favorites_total} located favorites in this Qloo sample are outside {area}.
+                {" "}This is a share of sampled places, not residents or a business-success probability.</p> : null}
               <ul className="mini">
                 {favorites.length ? (
                   favorites.map((place, k) => (
@@ -332,4 +336,3 @@ export function GapItem({ gap, index, open, onToggle, area = AREA }: GapItemProp
     </li>
   );
 }
-

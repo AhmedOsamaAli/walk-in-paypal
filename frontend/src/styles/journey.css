@@ -45,6 +45,13 @@
   transition: color .3s;
 }
 .sec-next-link:hover { color: var(--ink); }
+.score-explainer { margin: 14px 0 22px; color: var(--text-3); font-size: 13px; line-height: 1.55; max-width: 76ch; }
+.gap-score-value { display: flex; flex-direction: column; align-items: flex-start; }
+.gap-score-value > small { font: 400 12px var(--f-mono); color: var(--text-3); }
+.gap-sample-note { font-size: 13px; line-height: 1.5; color: var(--text-3); margin: 8px 0 12px; }
+.kit-shortcut { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--edge); }
+.kit-shortcut .ink-button { font-size: 14px; }
+.kit-shortcut p { margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--text-3); }
 
 /* ---------- The survey's tabs (App.tsx, components/Tabs.tsx): pinned under the bars, one panel at a time ---------- */
 /* Straight in the sheet, which has no padding of its own: the label lines up with the sections' text. */

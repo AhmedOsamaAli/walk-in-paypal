@@ -3,7 +3,6 @@ import { kits } from "../api/kit";
 import type { LaunchPlan } from "../api/types";
 import { naturalList } from "../lib/format";
 import { CHANNEL_NAMES, kitChannels, kitError } from "../lib/kit";
-import { areaText } from "../lib/launch";
 import { useNavigate } from "../lib/navigation";
 import { kitUrl } from "../lib/routes";
 import { Link } from "./Link";
@@ -36,8 +35,8 @@ function Contents({ plan }: { plan: LaunchPlan | null | undefined }) {
       </li>
       <li>
         <span>
-          <b>The window poster</b>, drawn from the real outline of the {plan ? areaText(plan.where) : "area"} and ready to
-          print. Add your own link and it carries a QR code to it.
+          <b>The window poster</b>, designed around this business and its offer, ready to print. Add your own link for a QR
+          code; a small street locator is optional.
         </span>
       </li>
       <li>
@@ -61,13 +60,40 @@ interface Found {
   url: string | null;
 }
 
-/** The launch kit for one concept: what is inside, and a button that makes it, or opens the one it already has. */
-export function KitOffer({ runId, index, name, plan }: KitOfferProps) {
+function useStartKit(runId: string, index: number) {
   const navigate = useNavigate();
-  const key = `${runId}:${index}`;
-  const [found, setFound] = useState<Found | null>(null);
   const [making, setMaking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  async function make() {
+    setMaking(true);
+    setError(null);
+    try {
+      const made = await kits.make(runId, index);
+      navigate(kitUrl(made.token));
+    } catch (failure) {
+      setMaking(false);
+      setError(kitError(failure, "The kit could not be started. Try again in a moment."));
+    }
+  }
+  return { making, error, make };
+}
+
+export function KitShortcut({ runId, index, name }: Omit<KitOfferProps, "plan">) {
+  const { making, error, make } = useStartKit(runId, index);
+  return <div className="kit-shortcut" onClick={(event) => { event.stopPropagation(); }}>
+    <button type="button" className="ink-button" aria-label={`Open or make the free launch kit for ${name}`}
+      aria-busy={making} aria-disabled={making} onClick={() => { if (!making) void make(); }}>
+      {making ? "Opening the kit…" : "Free launch kit"} <span aria-hidden="true">→</span>
+    </button>
+    <p role="status">{error ?? (making ? "Preparing the business's kit; an existing kit is reused." : "Poster, ad copy and report.")}</p>
+  </div>;
+}
+
+/** The launch kit for one concept: what is inside, and a button that makes it, or opens the one it already has. */
+export function KitOffer({ runId, index, name, plan }: KitOfferProps) {
+  const key = `${runId}:${index}`;
+  const [found, setFound] = useState<Found | null>(null);
+  const { making, error, make } = useStartKit(runId, index);
 
   useEffect(() => {
     const abort = new AbortController();
@@ -84,18 +110,6 @@ export function KitOffer({ runId, index, name, plan }: KitOfferProps) {
       abort.abort();
     };
   }, [key, runId, index]);
-
-  async function make() {
-    setMaking(true);
-    setError(null);
-    try {
-      const made = await kits.make(runId, index);
-      navigate(kitUrl(made.token));
-    } catch (failure) {
-      setMaking(false);
-      setError(kitError(failure, "The kit could not be started. Try again in a moment."));
-    }
-  }
 
   const known = found?.key === key ? found : null;
   const titleId = `kit-offer-${index}`;

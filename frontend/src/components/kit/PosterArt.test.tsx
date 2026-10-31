@@ -108,6 +108,18 @@ describe("the same poster renderer in different scenarios", () => {
     expect(html).toContain('fill="#111111"');
   });
 
+  it("never draws a book for the reported pastry business, even with an editorial palette", () => {
+    const pastry = { ...poster, name: "The Daily Grind", tagline: null, headline: "Freshly Baked Pastries",
+      subline: null, identity: { kind: "Patisserie", keywords: ["coffee"] } };
+    const html = renderToStaticMarkup(<PosterArt poster={pastry} link={null} />);
+    expect(html).toContain('data-poster-subject="pastry"');
+    expect(html).toContain('data-art="pastry"');
+    const unknown = renderToStaticMarkup(<PosterArt poster={{ ...pastry, identity: { kind: "Other", keywords: [] },
+      name: "Common Ground", headline: null }} link={null} />);
+    expect(unknown).toContain('data-art="abstract"');
+    expect(unknown).not.toContain('data-poster-subject="books"');
+  });
+
   it("can lead with a different actual perk without hiding the others", () => {
     const html = renderToStaticMarkup(<PosterArt poster={poster} campaign={campaign} sandbox
       appearance={{ choice: "auto", locator: false, leadPerk: campaign.perks[2] }} link="https://walkin-app.pages.dev/p/c1" />);

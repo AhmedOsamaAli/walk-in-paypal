@@ -1,5 +1,7 @@
-import { useEffect, useEffectEvent, useRef, useState, type KeyboardEvent } from "react";
-import type { GapRow, PlaceCard as Place, Walk } from "../api/types";
+import { Suspense, useCallback, useEffect, useEffectEvent, useRef, useState, type KeyboardEvent } from "react";
+import type { GapRow, HeatCell, PlaceCard as Place, Walk } from "../api/types";
+import { ErrorBoundary } from "../components/ErrorBoundary";
+import { lazyComponent, lazyModule } from "../lib/lazy";
 import { PlaceCard } from "../components/PlaceCard";
 import { SearchBox } from "../components/SearchBox";
 import { areaKey, areaShort, km2Text, walkShort, type Area } from "../lib/area";
@@ -12,6 +14,11 @@ import { BlueprintMap, type MapPoint } from "./controller";
 import { Legend } from "./Legend";
 import { openPin, pinFocus, subscribePins } from "./pinFocus";
 import { areaWord, type Pin } from "./pins";
+import { streetViewUrl } from "./realistic";
+import { circleWalk } from "./geometry";
+
+const realMap = lazyModule(() => import("./RealisticMap"));
+const RealisticMap = lazyComponent(realMap, (module) => module.RealisticMap);
 
 /** Where the docked map is a strip at the top of the results, and a tap on it opens it full screen (pins.css). */
 const STRIP = "(max-width: 980px)";
@@ -108,6 +115,11 @@ export function SurveyMap({
   const shown = opened?.gap === gap ? opened : null;
   /** The open category's taste grid is on the map, so the legend lists it. */
   const [grid, setGrid] = useState(false);
+  const [cells, setCells] = useState<HeatCell[]>([]);
+  const [realistic, setRealistic] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const failed3D = useCallback((message: string) => { setMapError(message); }, []);
+  if (!site && realistic) setRealistic(false);
   /** The docked strip has scrolled out of view: the Map button floats at the foot (phones and tablets). */
   const [away, setAway] = useState(false);
   // A map that can no longer grow (the brief gave way to a survey) is not left full screen.
@@ -141,15 +153,17 @@ export function SurveyMap({
   }
 
   /** A pin was pressed, or a list asked for one: its card opens, from the keyboard with focus in it. */
-  const select = useEffectEvent((pin: Pin, byKeyboard: boolean) => {
+  function selectPin(pin: Pin, byKeyboard: boolean) {
     if (!gap) return;
     setOpened({ pin, byKeyboard, gap, from: null });
     openPin(pin.key);
     // The strip has no room for the card: the map opens full screen with it.
     if (!full && expandable && window.matchMedia(STRIP).matches) grow();
-  });
+  }
+  const select = useEffectEvent(selectPin);
   /** A list's mark asks for its place: the docked map shows its card, or, where the map is a strip, opens full screen. */
   const reveal = useEffectEvent((key: string, byKeyboard: boolean) => {
+    setRealistic(false);
     const pin = controller.current?.revealPin(key);
     if (!pin || !gap) return;
     const strip = window.matchMedia(STRIP).matches;
@@ -195,8 +209,9 @@ export function SurveyMap({
         onPin: (pin, byKeyboard) => {
           select(pin, byKeyboard);
         },
-        onGrid: (drawn) => {
+        onGrid: (drawn, heat = []) => {
           setGrid(drawn);
+          setCells(heat);
         },
       },
     );
@@ -398,6 +413,7 @@ export function SurveyMap({
         className={cx("map-frame", full && "expanded")}
         data-expandable={expandable ? "" : undefined}
         data-dock={surveying && !full ? "" : undefined}
+        data-map-mode={realistic ? "3d" : "2d"}
         role={full ? "dialog" : "region"}
         aria-modal={full ? true : undefined}
         aria-label={full ? "Full-screen map" : "Map of the site and its surroundings"}
@@ -416,6 +432,8 @@ export function SurveyMap({
         <div
           ref={canvas}
           className="map-canvas"
+          aria-hidden={realistic}
+          inert={realistic}
           onKeyDown={(event) => {
             // Enter places the site at the cross in the middle, for the keyboard.
             if (event.key !== "Enter" || event.target !== event.currentTarget || !pinnable) return;
@@ -424,6 +442,22 @@ export function SurveyMap({
             if (center) onPick(center);
           }}
         />
+        {realistic && site ? <ErrorBoundary fallback={<p className="realistic-notice" role="alert">The 3D view could not load. Choose 2D to continue.</p>}>
+          <Suspense fallback={<p className="realistic-notice" role="status">Loading the optional 3D renderer…</p>}>
+            <RealisticMap site={site} walk={walk ?? circleWalk(site.lat, site.lon, asked)} gap={gap} cells={cells}
+              pinnable={pinnable} onPick={(lat, lon) => { if (pinnable) onPick({ lat, lon }); }}
+              onPin={selectPin} onError={failed3D} />
+          </Suspense>
+        </ErrorBoundary> : null}
+        {mapError && realistic ? <p className="realistic-notice" role="alert">{mapError}{" "}
+          <button type="button" onClick={() => { setRealistic(false); setMapError(null); }}>Return to 2D</button></p> : null}
+        <div className="map-modes" role="group" aria-label="Map view">
+          <button type="button" aria-pressed={!realistic} onClick={() => { setRealistic(false); setMapError(null); }}>2D</button>
+          <button type="button" aria-pressed={realistic} disabled={!site}
+            title={site ? "Optional mapped buildings and streets" : "Choose a site before opening 3D"}
+            onClick={() => { setMapError(null); setRealistic(true); }}>3D buildings</button>
+          {site ? <a href={streetViewUrl(shown?.pin ?? site)} target="_blank" rel="noopener noreferrer">Street View ↗</a> : null}
+        </div>
         <div ref={readout} className="readout mono" aria-hidden="true" />
         {pinnable ? (
           <>

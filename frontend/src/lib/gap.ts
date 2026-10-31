@@ -1,6 +1,13 @@
 import type { GapRow, OsmCheck, OsmPlace } from "../api/types";
 import { gapWhy, safeLink } from "./format";
 
+export function favoritesOutsidePercent(gap: GapRow): number | null {
+  const { favorites_far: outside, favorites_total: total } = gap;
+  if (gap.favorites_kind !== "local" || !Number.isInteger(total) || !Number.isInteger(outside) ||
+      total <= 0 || outside < 0 || outside > total) return null;
+  return Math.round(outside / total * 100);
+}
+
 /** The badge of a gap whose fans travel for it. Surveys saved before the wording changed say "Locals travel for it". */
 export const TRAVEL_READING = "People here travel for it";
 const LEGACY_READINGS: Readonly<Record<string, string>> = { "Locals travel for it": TRAVEL_READING };

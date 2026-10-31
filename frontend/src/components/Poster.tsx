@@ -7,6 +7,7 @@ import { posterButtonId } from "../lib/sections";
 import { POSTER_TITLES, themeOf } from "../lib/wildTheme";
 import { CountUp } from "./CountUp";
 import { WildTheme } from "./WildTheme";
+import { KitShortcut } from "./KitOffer";
 
 interface PosterProps {
   concept: Concept;
@@ -17,6 +18,7 @@ interface PosterProps {
   /** Its place on the page, for the order the cards come in. */
   position: number;
   onOpen: (index: number, opener: HTMLElement | null) => void;
+  runId?: string | null;
 }
 
 const capitalized = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
@@ -56,7 +58,7 @@ function Pair({ items, evidence }: { items: string[]; evidence: LoveItem[] }) {
  * combines a kind of place with a theme, and shows the titles people here over-index on that the theme is built on,
  * with their pictures, what happens there and who those titles draw.
  */
-export function Poster({ concept, index, rank, position, onOpen }: PosterProps) {
+export function Poster({ concept, index, rank, position, onOpen, runId }: PosterProps) {
   const button = useRef<HTMLButtonElement>(null);
   const wild = rank === null;
   const theme = wild ? themeOf(concept) : null;
@@ -88,7 +90,7 @@ export function Poster({ concept, index, rank, position, onOpen }: PosterProps) 
         ) : typeof concept.gap_score === "number" ? (
           <div className="poster-score">
             <CountUp value={concept.gap_score} />
-            <small>gap</small>
+            <small>gap /100</small>
           </div>
         ) : null}
         <h3 className="poster-name" id={`poster-${index}-name`}>
@@ -157,6 +159,7 @@ export function Poster({ concept, index, rank, position, onOpen }: PosterProps) 
         <span>Open design sheet</span>
         <span aria-hidden="true">→</span>
       </button>
+      {runId ? <KitShortcut runId={runId} index={index} name={concept.name} /> : null}
     </article>
   );
 }

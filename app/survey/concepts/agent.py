@@ -46,7 +46,10 @@ def agent_brief(run: RunState) -> dict:
     return brief
 
 
-CONCEPT_SYSTEM = """You are a retail and hospitality strategist who designs businesses for empty storefronts.
+CONCEPT_SYSTEM = """You are a neighborhood business strategist who designs storefronts across retail, services,
+leisure, wellness, culture and hospitality. Food and drink are not the default: consider the actual measured gaps,
+including non-food businesses, and let evidence and the owner's rules determine the concepts. Do not invent variety
+by recommending a weak category over a stronger fitting one.
 You only reason from Qloo evidence about the people inside the site's area (catchment.area in the evidence: a walk, a
 drive or a road distance, such as "10-minute walk" or "30-minute drive"): residents, workers and visitors alike, so call
 them "people here", never "locals". Never call the area a walk unless it is one. When the site has an age_focus, the
@@ -120,7 +123,7 @@ CONCEPT_TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "category": {"type": "string", "description": "A storefront category, e.g. 'bakery' or 'sports bar'"},
+                    "category": {"type": "string", "description": "A specific storefront category, e.g. bookstore, bicycle repair, gym, florist or bakery"},
                     "reason": REASON,
                 },
                 "required": ["category", "reason"],

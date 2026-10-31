@@ -78,6 +78,7 @@ interface ConceptsSectionProps {
   rules: readonly string[];
   baseline: BaselineConcept[];
   onOpen: (index: number, opener: HTMLElement | null) => void;
+  runId?: string | null;
 }
 
 /** The section's last word: what to do with a concept, and the first card's design sheet a click away. */
@@ -99,12 +100,13 @@ function NextStep({ lead, onOpen }: { lead: Placed; onOpen: ConceptsSectionProps
   );
 }
 
-export function ConceptsSection({ no, data, rules, baseline, onOpen }: ConceptsSectionProps) {
+export function ConceptsSection({ no, data, rules, baseline, onOpen, runId }: ConceptsSectionProps) {
   const placed = placeConcepts(data.concepts ?? []);
   const [lead] = placed;
   return (
     <section id="s-concepts" className="sec reveal">
       <SectionHead no={no} title="What it should become" note={conceptsNote(data)} />
+      <p className="score-explainer">Scores are evidence-based gaps out of 100, not chances of success. Each concept has a direct route to its free launch kit.</p>
       {data.caution && placed.length ? <p className="concepts-caution">{data.caution}</p> : null}
       <Kept rules={ruleNames(rules)} notes={changeNotes(data)} designed={placed.length > 0} />
       {placed.length ? (
@@ -117,6 +119,7 @@ export function ConceptsSection({ no, data, rules, baseline, onOpen }: ConceptsS
               rank={rank}
               position={position}
               onOpen={onOpen}
+              runId={runId}
             />
           ))}
         </div>

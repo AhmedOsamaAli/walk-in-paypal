@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GapRow, OsmCheck } from "../api/types";
 import {
+  favoritesOutsidePercent,
   insideShort,
   leadLine,
   OSM_TOO_BIG,
@@ -39,6 +40,13 @@ function gap(over: Partial<GapRow> = {}): GapRow {
 
 const JOES = { name: "Joe's Bakery & Coffee Shop", lat: 30.26, lon: -97.72, url: "https://www.openstreetmap.org/node/1", tag: "shop=bakery", distance_m: 610 };
 const INSOMNIA = { name: "Insomnia Cookies", lat: 30.263, lon: -97.727, url: "https://www.openstreetmap.org/way/2", tag: "shop=pastry", distance_m: 331 };
+
+it("shows only a real share of located favorites, never a success probability or a share of residents", () => {
+  expect(favoritesOutsidePercent(gap())).toBe(80);
+  expect(favoritesOutsidePercent(gap({ favorites_far: 0 }))).toBe(0);
+  for (const change of [{ favorites_total: 0 }, { favorites_far: 9 }, { favorites_far: -1 }, { favorites_total: NaN },
+    { favorites_kind: "citywide" as const }]) expect(favoritesOutsidePercent(gap(change))).toBeNull();
+});
 
 function checked(over: Partial<OsmCheck> = {}): OsmCheck {
   return { checked: true, count: 4, extra: [INSOMNIA, JOES], credit: "© OpenStreetMap contributors", ...over };

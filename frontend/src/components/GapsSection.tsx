@@ -24,7 +24,7 @@ export function GapsSection({ no, gaps, openGap, onToggle, area = AREA }: GapsSe
       <div className="gap-key mono" aria-hidden="true">
         <span>
           <i className="k-score" />
-          Gap score
+          Gap score /100
         </span>
         <span>
           <i className="k-supply" />
@@ -35,6 +35,7 @@ export function GapsSection({ no, gaps, openGap, onToggle, area = AREA }: GapsSe
           Favorites of people here, outside it
         </span>
       </div>
+      <p className="score-explainer">The gap score combines local demand, supply and travel evidence. It is not a percentage or a prediction of success.</p>
       <ol className="gaps">
         {gaps.length ? (
           gaps.map((gap, index) => (

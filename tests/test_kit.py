@@ -137,6 +137,20 @@ def facts_of(run: RunState, design: dict, claims: list[dict] | None = None) -> k
     return kit.facts_for(run, concept, design, name, kit.usable_claims(concept, design)[0] if claims is None else claims)
 
 
+def test_clipped_model_copy_is_rejected_at_source_before_it_can_reach_any_kit_surface():
+    run = world()
+    facts = facts_of(run, sheet(run))
+    for text in ("Enjoy coffee and freshly", "Rye loaf with", "Made for the", "Butter croissants..."):
+        assert any("ends mid-sentence" in reason for reason in facts.check(text)), text
+    kept, rejected, _ = kit.check_answer(
+        {"poster": {"headline": "Rye loaf", "subline": "Enjoy coffee and freshly", "claims": []}},
+        ["poster"], facts, set(),
+    )
+    assert "subline" not in kept["poster"]["fields"]
+    assert rejected[0]["field"] == "subline" and "ends mid-sentence" in rejected[0]["reasons"][0]
+    assert facts.check("Rye loaf and kouign amann.") == []
+
+
 def assert_valid(ads: dict, facts: kit.Facts) -> None:
     """Every line within its limits and past every check; lists within their sizes."""
     for key, pieced in ads.items():
